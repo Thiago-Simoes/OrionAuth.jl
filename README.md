@@ -44,6 +44,6 @@ If you discover any **vulnerabilities**, please report them via issues.
 $ julia --project make.jl
 
 ## License
-JuliaWebSession is distributed in the hope that it will be useful,
+NebulaAuth is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

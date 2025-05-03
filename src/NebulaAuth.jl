@@ -20,6 +20,7 @@ function init!()
     include(joinpath(dir, "user.jl"))
     include(joinpath(dir, "password.jl"))
     include(joinpath(dir, "auth.jl"))
+    include(joinpath(dir, "jwt.jl"))
 
     @eval begin
         NebulaAuth_Log = Model(

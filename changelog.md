@@ -1,7 +1,7 @@
 # Changelog
 
 ## [0.1.2]
-## Upcoming
+## Added
 - Implementation of JWT for secure session handling.
 
 ## [0.1.1]
