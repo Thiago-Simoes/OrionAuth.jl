@@ -2,49 +2,74 @@
 
 using Test
 using Dates
-using NebulaORM
-using NebulaAuth
 
+using DotEnv
+DotEnv.load!()
+
+using NebulaORM
+
+using NebulaAuth
+NebulaAuth.init!()
 
 # Define um usuário de autenticação
 user = signup("th.simoes@proton.me", "Thiago Simões", "123456")
-@test userLogging = NebulaAuth.signin(user.email, "123456")
+userLogging = signin(user.email, "123456")
+@test userLogging !== nothing
+@test userLogging.id == user.id
+@test userLogging.name == user.name
 @test userLogging.email == user.email
 
+
+
 # Relationship
-# Model(
-#     :Profile,
-#     [
-#         ("id", @INTEGER, [@PrimaryKey(), @AutoIncrement()]),
-#         ("userId", @INTEGER, []),
-#         ("bio", @TEXT, []),
-#         ("location", @TEXT, []),
-#         ("website", @TEXT, []),
-#         ("created_at", @TEXT, []),
-#         ("updated_at", @TEXT, [])
-#     ],
-#     [
-#         ("userId", NebulaAuth_User, "id", :belongTo)
-#     ]
-# )
+Model(
+    :Profile,
+    [
+        ("id", INTEGER(), [PrimaryKey(), AutoIncrement()]),
+        ("userId", INTEGER(), []),
+        ("bio", TEXT(), []),
+        ("location", TEXT(), []),
+        ("website", TEXT(), []),
+        ("created_at", TEXT(), []),
+        ("updated_at", TEXT(), [])
+    ],
+    [
+        ("userId", NebulaAuth_User, "id", :belongsTo)
+    ]
+)
 
-# @test profile = create(Profile, Dict(
-#     "userId" => user.id,
-#     "bio" => "Software Engineer",
-#     "location" => "Brazil",
-#     "website" => "https://example.com",
-#     "created_at" => string(Dates.now()),
-#     "updated_at" => string(Dates.now())
-# ))
+profile = create(Profile, Dict(
+    "userId" => user.id,
+    "bio" => "Software Engineer",
+    "location" => "Brazil",
+    "website" => "https://example.com",
+    "created_at" => string(Dates.now()),
+    "updated_at" => string(Dates.now())
+))
 
-# @test profile.userId == user.id
-# @test profile.bio == "Software Engineer"
+@test profile.userId == user.id
+@test profile.bio == "Software Engineer"
 
 # # Testar busca
-# @test profile_user = findFirst(NebulaAuth_User; query=Dict("where" => Dict("id" => profile.userId)))
+profile_user = findFirst(NebulaAuth_User; query=Dict("where" => Dict("id" => profile.userId)))
+@test profile_user !== nothing
+@test profile_user.id == user.id
 
 # # Buscar o perfil do usuário
-# @test profile_user = findFirst(Profile; query=Dict("where" => Dict("userId" => user.id)))
+profile_user = findFirst(Profile; query=Dict("where" => Dict("userId" => user.id)))
+@test profile_user !== nothing
+@test profile_user.id == profile.id
+@test profile_user.userId == user.id
 
 # # Buscar pela relação
-# @test profile_user = findFirst(NebulaAuth_User; query=Dict("where" => Dict("id" => profile.userId), "include" => [Profile]))
+profile_user = findFirst(NebulaAuth_User; query=Dict("where" => Dict("id" => profile.userId), "include" => [Profile]))
+@test profile_user !== nothing
+@test profile_user["NebulaAuth_User"].id == user.id
+@test profile_user["Profile"][1].id == profile.id
+
+
+# Reset o banco de dados
+conn = dbConnection()
+dropTable!(conn, "NebulaAuth_User")
+dropTable!(conn, "NebulaAuth_Log")
+dropTable!(conn, "Profile")
