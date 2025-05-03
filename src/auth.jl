@@ -12,7 +12,7 @@ function signup(email::String, name::String, password::String)
         error("User already exists")
     end
     uuid = string(UUIDs.uuid4())
-    hashed_password = bytes2hex(sha256(password))
+    hashed_password = __NEBULA__HashPassword(password)
     ts = string(Dates.now())
     local new_user = create(NebulaAuth_User, Dict(
         "email"      => email,
@@ -30,8 +30,8 @@ function signin(email::String, password::String)
     if user === nothing
         error("User not found")
     end
-    hashed_password = bytes2hex(sha256(password))
-    if user.password != hashed_password
+    
+    if !__NEBULA__VerifyPassword(password, user.password)
         error("Invalid password")
     end
     log_action("signin", user)

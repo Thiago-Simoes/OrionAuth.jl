@@ -22,3 +22,4 @@
 - Configurable password policies and account security settings.
 - Admin monitoring dashboard for real-time audit trails and analytics.
 - Detailed compliance audit logs with external logging service integration.
+- Implement Argon2 or bcrypt
