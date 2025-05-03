@@ -1,9 +1,12 @@
 # Changelog
 
-## [0.1.1]
+## [0.1.2]
 ## Upcoming
+- Implementation of JWT for secure session handling.
+
+## [0.1.1]
+## Added
 - Migration from current SHA256 mechanism to SHA512 with salt for improved security.
-- Implementation of JWT for secure session handling using custom, from-scratch hashing.
 
 ## [0.1.0] - 2025-05-03
 ### Added
