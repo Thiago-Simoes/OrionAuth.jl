@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.1.1]
+## Upcoming
+- Migration from current SHA256 mechanism to SHA512 with salt for improved security.
+- Implementation of JWT for secure session handling using custom, from-scratch hashing.
+
 ## [0.1.0] - 2025-05-03
 ### Added
 - Initial release with core authentication features.
@@ -7,8 +12,6 @@
 - Basic password hashing and model definitions.
 
 ## Upcoming
-- Migration from the current SHA256 mechanism to SHA512 with salt for improved security.
-- Implementation of JWT for secure session handling using custom, from-scratch hashing.
 - Email confirmation with secure token-based validation.
 - Password reset functionality with secure token distribution and expiry.
 - Enhanced log registration and auditing features.
