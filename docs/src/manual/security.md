@@ -4,6 +4,8 @@ NebulaAuth incorporates multiple security mechanisms to safeguard your applicati
 
 ## JWT-Based Session Handling
 NebulaAuth uses JSON Web Tokens (JWT) for stateless authentication.
+**Based on RFC7519.**
+
 - **Token Creation:**  
   Generate a token after user authentication:
   ```julia

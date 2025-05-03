@@ -8,7 +8,7 @@ makedocs(
     modules=[NebulaAuth],
     pages = [
     "Home" => "index.md",
-    # "Manual" => ["manual/start.md", "manual/relationship.md"],
+    "Manual" => ["manual/start.md", "manual/relationships.md", "manual/security.md"],
     "Reference" => ["Reference/API.md"]
     ]
 )

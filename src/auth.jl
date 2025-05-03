@@ -21,7 +21,17 @@ function signup(email::String, name::String, password::String)
         "password"   => hashed_password
     ))
     log_action("signup", new_user)
-    return new_user
+
+    # Login
+    payload = generateJWT(new_user)
+
+    returnData = Dict(
+        "access_token" => payload,
+        "token_type" => "Bearer",
+        "expiration" => parse(Int, ENV["NEBULAAUTH_JWT_EXP"])*60,
+    ) |> JSON3.write
+
+    return new_user, returnData
 end
 
 # Altered signin function with password verification.
@@ -35,6 +45,21 @@ function signin(email::String, password::String)
         error("Invalid password")
     end
     log_action("signin", user)
-    return user
+
+    # Generate JWT token
+    payload = generateJWT(user)
+
+    returnData = Dict(
+        "access_token" => payload,
+        "token_type" => "Bearer",
+        "expiration" => parse(Int, ENV["NEBULAAUTH_JWT_EXP"])*60,
+    ) |> JSON3.write
+
+    return user, returnData
 end
 
+function generateJWT(user)
+    payload = Dict("sub" => user.id, "name" => user.name, "email" => user.email, "uuid" => user.uuid, "roles" => getUserRoles(user.id), "permissions" => getUserPermissions(user.id))
+    token = __NEBULA__EncodeJWT(payload, ENV["NEBULAAUTH_SECRET"])
+    return token
+end
