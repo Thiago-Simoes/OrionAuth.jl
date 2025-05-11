@@ -26,3 +26,13 @@
 - Admin monitoring dashboard for real-time audit trails and analytics.
 - Detailed compliance audit logs with external logging service integration.
 - Implement Argon2 or bcrypt
+
+## Security Improvements - for prod-ready
+- Use constant-time comparison functions for password and JWT signature verification.
+- Ensure NEBULAAUTH_ALGORITHM environment variable is validated and matches supported HMAC algorithms in code.
+- Implement refresh token mechanism with unique JWT ID (jti) and blacklist support for immediate revocation.
+- Add standard JWT claims: iss (issuer), aud (audience), jti (JWT ID), and nbf (not before).
+- Migrate password hashing to a modern KDF (Argon2id or bcrypt) instead of iterated SHA-512.
+- Enforce rate limiting and account lockout after configurable failed login attempts.
+- Support multi-factor authentication (e.g., TOTP) for enhanced account security.
+- Refine error handling to return controlled HTTP status codes without exposing internal stack traces.

@@ -1,5 +1,3 @@
-# Implementa os testes unitários para o módulo `ORM.jl` e suas dependências.
-
 using Test
 using Dates
 
@@ -12,7 +10,6 @@ using NebulaAuth
 NebulaAuth.init!()
 
 @testset "NebulaAuth" begin
-    # Define um usuário de autenticação
     user, jwt = signup("th.simoes@proton.me", "Thiago Simões", "123456")
     userLogging, jwt = signin("th.simoes@proton.me", "123456")
     @testset verbose=true "Authentication - Login/Register" begin
@@ -22,7 +19,6 @@ NebulaAuth.init!()
         @test userLogging.email == user.email
     end
 
-    # Relationship
     Model(
         :Profile,
         [
@@ -78,19 +74,15 @@ NebulaAuth.init!()
         @test role.role == "admin"
         @test role.description == "Administrator role"
 
-        # Testar busca
         role = findFirst(NebulaAuth_Role; query=Dict("where" => Dict("role" => "admin")))
         @test role !== nothing
         @test role.role == "admin"
 
-        # Assing role
-        assignRole(user.id, role.role)
-        # Testar busca
+        AssignRoleToUser(user.id, role.role)
         user_role = findFirst(NebulaAuth_UserRole; query=Dict("where" => Dict("userId" => user.id, "roleId" => role.id)))
         @test user_role !== nothing
         @test user_role.userId == user.id
 
-        # Testar busca
         user_with_role = findFirst(NebulaAuth_User; query=Dict("where" => Dict("id" => user.id), "include" => [NebulaAuth_UserRole]))
         @test user_with_role !== nothing
         @test user_with_role["NebulaAuth_UserRole"][1].userId == user.id
@@ -106,25 +98,21 @@ NebulaAuth.init!()
         @test permission.permission == "read"
         @test permission.description == "Read permission"
 
-        # Testar busca
         permission = findFirst(NebulaAuth_Permission; query=Dict("where" => Dict("permission" => "read")))
         @test permission !== nothing
         @test permission.permission == "read"
 
-        assignPermission(user.id, permission.permission)
-        # Testar busca
+        AssignPermissionToUser(user.id, permission.permission)
         user_permission = findFirst(NebulaAuth_UserPermission; query=Dict("where" => Dict("userId" => user.id, "permissionId" => permission.id)))
         @test user_permission !== nothing
         @test user_permission.userId == user.id
 
-        # Testar busca
         user_with_permission = findFirst(NebulaAuth_User; query=Dict("where" => Dict("id" => user.id), "include" => [NebulaAuth_UserPermission]))
         @test user_with_permission !== nothing
         @test user_with_permission["NebulaAuth_UserPermission"][1].userId == user.id
     end
 
     @testset verbose=true "Permissions - Inheritance" begin
-        # Criar uma permissão pai
         parent_permission = create(NebulaAuth_Permission, Dict(
             "permission" => "write",
             "description" => "Write permission"
@@ -134,43 +122,35 @@ NebulaAuth.init!()
         @test parent_permission.permission == "write"
         @test parent_permission.description == "Write permission"
 
-        # Testar busca
         parent_permission = findFirst(NebulaAuth_Permission; query=Dict("where" => Dict("permission" => "write")))
         @test parent_permission !== nothing
         @test parent_permission.permission == "write"
 
-        # Clean permission
         deleteMany(NebulaAuth_UserPermission, Dict("where" => Dict("userId" => user.id)))
 
-        # Assign permission to role
-        syncRolesAndPermissions(Dict(
+        SyncRolesAndPermissions(Dict(
             "admin" => ["read", "write", "delete"],
             "user" => ["read"]
         ))
 
-        # Testar busca
         role_permission = findFirst(NebulaAuth_RolePermission; query=Dict("where" => Dict("roleId" => role.id, "permissionId" => parent_permission.id)))
         @test role_permission !== nothing
         @test role_permission.roleId == role.id
 
-        # Testar busca
         role_with_permission = findFirst(NebulaAuth_Role; query=Dict("where" => Dict("id" => role.id), "include" => [NebulaAuth_RolePermission]))
         @test role_with_permission !== nothing
         @test role_with_permission["NebulaAuth_RolePermission"][1].roleId == role.id
 
-        # Testar busca
         user_with_role_permission = findFirst(NebulaAuth_User; query=Dict("where" => Dict("id" => user.id), "include" => [NebulaAuth_UserRole]))
         @test user_with_role_permission !== nothing
         @test user_with_role_permission["NebulaAuth_UserRole"][1].userId == user.id
 
-        # Testar busca
-        @test NebulaAuth.getUserPermissions(user.id) .|> (x -> x.permission) == ["read", "write", "delete"]
-        @test checkPermission(user.id, "read") == true
+        @test NebulaAuth.GetUserPermissions(user.id) .|> (x -> x.permission) == ["read", "write", "delete"]
+        @test CheckUserPermission(user.id, "read") == true
     end
 
 end
 
-# Reset o banco de dados
 conn = dbConnection()
 dropTable!(conn, "NebulaAuth_User")
 dropTable!(conn, "NebulaAuth_Log")

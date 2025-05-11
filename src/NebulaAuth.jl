@@ -20,7 +20,6 @@ function init!()
     
     include(joinpath(dir, "bin/base64.jl"))
 
-    include(joinpath(dir, "user.jl"))
     include(joinpath(dir, "password.jl"))
     include(joinpath(dir, "roles.jl"))
     include(joinpath(dir, "auth.jl"))
@@ -133,19 +132,10 @@ function init!()
         )
 
     end
+
     nothing
 end
 
-# include("./signup.jl")
-# include("./login.jl")
-# include("./logout.jl")
-# include("./reset_password.jl")
-# include("./verify_email.jl")
-# include("./update_profile.jl")
-# include("./update_password.jl")
-# include("./update_email.jl")
-
-export NebulaAuth_User, signin, signup, syncRolesPermissions, assignRole,
-    hasPermission, assignPermission, syncRolesAndPermissions, getUserPermissions, checkPermission, removeRole
+export NebulaAuth_User, signin, signup, syncRolesPermissions, AssignRoleToUser, AssignPermissionToUser, SyncRolesAndPermissions, GetUserPermissions, CheckUserPermission, removeRole
 
 end # module NebulaAuth

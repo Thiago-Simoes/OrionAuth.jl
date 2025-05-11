@@ -1,247 +1,275 @@
 
 """
-    assign_role(user_id::Int, role::String)
+    FetchUser(userId::Int) :: Dict
 
-Assign a role to a user.
+Busca um usuário pelo ID. Se não existir, gera erro.
 """
-function assignRole(user_id::Int, role::String)
-    # Check if user exists
-    user = findFirst(NebulaAuth_User; query=Dict("where" => Dict("id" => user_id)))
+function FetchUser(userId::Int)::NebulaAuth_User
+    user = findFirst(NebulaAuth_User; query=Dict("where" => Dict("id" => userId)))
     if user === nothing
         error("User not found")
     end
+    return user
+end
 
-    # Check if role exists
-    role = findFirst(NebulaAuth_Role; query=Dict("where" => Dict("role" => role)))
+"""
+    FetchRole(roleName::String) :: Dict
+
+Busca uma role pelo nome. Se não existir, gera erro.
+"""
+function FetchRole(roleName::String)::NebulaAuth_Role
+    role = findFirst(NebulaAuth_Role; query=Dict("where" => Dict("role" => roleName)))
     if role === nothing
         error("Role not found")
     end
+    return role
+end
 
-    # Check if user already has the role
-    existing = findFirst(NebulaAuth_UserRole; query=Dict("where" => Dict("userId" => user_id, "roleId" => role.id)))
-    if existing !== nothing
+"""
+    FetchPermission(permissionName::String) :: Dict
+
+Busca uma permissão pelo nome. Se não existir, gera erro.
+"""
+function FetchPermission(permissionName::String)::NebulaAuth_Permission
+    permission = findFirst(NebulaAuth_Permission; query=Dict("where" => Dict("permission" => permissionName)))
+    if permission === nothing
+        error("Permission not found")
+    end
+    return permission
+end
+
+"""
+    FetchUserRoleRelation(userId::Int, roleId::Int) :: Union{Nothing, Dict}
+
+Busca a relação usuário-role. Retorna nothing se não existir.
+"""
+function FetchUserRoleRelation(userId::Int, roleId::Int)::Union{Nothing, NebulaAuth_UserRole}
+    return findFirst(NebulaAuth_UserRole; query=Dict("where" => Dict("userId" => userId, "roleId" => roleId)))
+end
+
+"""
+    FetchUserPermissionRelation(userId::Int, permissionId::Int) :: Union{Nothing, Dict}
+
+Busca a relação usuário-permissão. Retorna nothing se não existir.
+"""
+function FetchUserPermissionRelation(userId::Int, permissionId::Int)::Union{Nothing, NebulaAuth_UserPermission}
+    return findFirst(NebulaAuth_UserPermission; query=Dict("where" => Dict("userId" => userId, "permissionId" => permissionId)))
+end
+
+
+# Funções de Responsabilidade Única
+
+"""
+    AssignRoleToUser(userId::Int, roleName::String) :: Any
+
+Atribui uma role a um usuário após as devidas verificações.
+"""
+function AssignRoleToUser(userId::Int, roleName::String)
+    user = FetchUser(userId)
+    role = FetchRole(roleName)
+    if FetchUserRoleRelation(userId, role.id) !== nothing
         error("User already has this role")
     end
 
-    # Assign role to user
-    new_user_role = create(NebulaAuth_UserRole, Dict(
-        "userId" => user_id,
+    newUserRole = create(NebulaAuth_UserRole, Dict(
+        "userId" => userId,
         "roleId" => role.id
     ))
 
-    # Log the action
-    log_action("assign_role: Assigned role \"$(role.role)\" (Role ID: $(role.id)) to user ID $(user.id) at $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))", user)
-    return new_user_role    
+    ts = Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS")
+    @async log_action(
+        "AssignRoleToUser: Assigned role $(role.role) (ID: $(role.id)) to user ID $(user.id) at $(ts)",
+        user.id
+    )
+    return newUserRole
 end
 
-function removeRole(user_id::Int, role::String)
-    # Check if user exists
-    user = findFirst(NebulaAuth_User; query=Dict("where" => Dict("id" => user_id)))
-    if user === nothing
-        error("User not found")
-    end
+"""
+    RemoveRoleFromUser(userId::Int, roleName::String) :: Bool
 
-    # Check if role exists
-    role = findFirst(NebulaAuth_Role; query=Dict("where" => Dict("role" => role)))
-    if role === nothing
-        error("Role not found")
-    end
-
-    # Check if user has the role
-    existing = findFirst(NebulaAuth_UserRole; query=Dict("where" => Dict("userId" => user_id, "roleId" => role.id)))
+Remove uma role de um usuário após verificações.
+"""
+function RemoveRoleFromUser(userId::Int, roleName::String)::Bool
+    user = FetchUser(userId)
+    role = FetchRole(roleName)
+    local existing = FetchUserRoleRelation(userId, role.id)
     if existing === nothing
         error("User does not have this role")
     end
 
-    # Remove the role from the user
+    ts = Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS")
     delete(existing)
-
-    # Log the action
-    log_action("remove_role: Removed role \"$(role.role)\" (Role ID: $(role.id)) from user ID $(user.id) at $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))", user)
+    @async log_action(
+        "RemoveRoleFromUser: Removed role $(role.role) (ID: $(role.id)) from user ID $(user.id) at $(ts)",
+        user.id
+    )
     return true
 end
 
-function getUserRoles(user_id::Int)
-    # Check if user exists
-    user = findFirst(NebulaAuth_User; query=Dict("where" => Dict("id" => user_id), "include" => [NebulaAuth_UserRole]))
+"""
+    GetUserRoles(userId::Int) :: Vector{Any}
+
+Retorna as roles atribuídas a um usuário.
+"""
+function GetUserRoles(userId::Int)::Vector{Any}
+    # Inclui roles na consulta
+    user = findFirst(NebulaAuth_User; query=Dict("where" => Dict("id" => userId), "include" => [NebulaAuth_UserRole]))
     if user === nothing
         error("User not found")
     end
 
-    # Get roles assigned to the user
-    roles = user["NebulaAuth_UserRole"]
-    if isempty(roles)
-        []
-    end
-    
-    # Log the action
-    userId = user["NebulaAuth_User"].id
-    log_action("get_user_roles: Retrieved roles for user ID $(userId) at $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))", user["NebulaAuth_User"])
+    local roles = user["NebulaAuth_UserRole"]
+    ts = Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS")
+    @async log_action(
+        "GetUserRoles: Retrieved roles for user ID $(user["NebulaAuth_User"].id) at $(ts)",
+        user["NebulaAuth_User"].id
+    )
     return roles
 end
 
-function assignPermission(user_id::Int, permission::String)
-    # Check if user exists
-    user = findFirst(NebulaAuth_User; query=Dict("where" => Dict("id" => user_id), "include" => [NebulaAuth_UserPermission]))
+"""
+    AssignPermissionToUser(userId::Int, permissionName::String) :: Any
+
+Atribui uma permissão a um usuário após verificar se já não existe.
+"""
+function AssignPermissionToUser(userId::Int, permissionName::String)
+    user = findFirst(NebulaAuth_User; query=Dict("where" => Dict("id" => userId), "include" => [NebulaAuth_UserPermission]))
     if user === nothing
         error("User not found")
     end
 
-    # Check if permission exists
-    permission = findFirst(NebulaAuth_Permission; query=Dict("where" => Dict("permission" => permission)))
-    if permission === nothing
-        error("Permission not found")
-    end
-
-    # Check if user already has the permission
-    # Using the user["NebulaAuth_UserPermission"] to check if the user has the permission
-    existing = user["NebulaAuth_UserPermission"]
-    if !isempty(existing)
-        for perm in existing
-            if perm.permissionId == permission.id
-                error("User already has this permission")
-            end
+    permission = FetchPermission(permissionName)
+    for perm in user["NebulaAuth_UserPermission"]
+        if perm.permissionId == permission.id
+            error("User already has this permission")
         end
     end
 
-    # Assign permission to user
-    new_user_permission = create(NebulaAuth_UserPermission, Dict(
-        "userId" => user_id,
+    newUserPermission = create(NebulaAuth_UserPermission, Dict(
+        "userId" => userId,
         "permissionId" => permission.id
     ))
 
-    # Log the action
-    userId = user["NebulaAuth_User"].id
-    log_action("assign_permission: Assigned permission \"$(permission.permission)\" (Permission ID: $(permission.id)) to user ID $(userId) at $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))", user["NebulaAuth_User"])
-    return new_user_permission    
+    ts = Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS")
+    @async log_action(
+        "AssignPermissionToUser: Assigned permission \"$(permission.permission)\" (ID: $(permission.id)) to user ID $(user["NebulaAuth_User"].id) at $(ts)",
+        user["NebulaAuth_User"].id
+    )
+    return newUserPermission
 end
 
-function removePermission(user_id::Int, permission::String)
-    # Check if user exists
-    user = findFirst(NebulaAuth_User; query=Dict("where" => Dict("id" => user_id), "include" => [NebulaAuth_UserPermission]))
+"""
+    RemovePermissionFromUser(userId::Int, permissionName::String) :: Bool
+
+Remove uma permissão de um usuário após verificar se a relação existe.
+"""
+function RemovePermissionFromUser(userId::Int, permissionName::String)::Bool
+    user = findFirst(NebulaAuth_User; query=Dict("where" => Dict("id" => userId), "include" => [NebulaAuth_UserPermission]))
     if user === nothing
         error("User not found")
     end
 
-    # Check if permission exists in the database
-    # Using the user["NebulaAuth_UserPermission"] to check if the user has the permission
-    if isempty(user["NebulaAuth_UserPermission"])
-        error("Permission not found")
-    end
-
-    existing = nothing
+    permission = FetchPermission(permissionName)
+    local existing = nothing
     for perm in user["NebulaAuth_UserPermission"]
-        if perm.permissionId == permission
+        if perm.permissionId == permission.id
             existing = perm
             break
         end
     end
+    if existing === nothing
+        error("User does not have this permission")
+    end
 
-    # Remove the permission from the user
-    delete!(existing)
+    delete(existing)
 
-    # Log the action
-    userId = user["NebulaAuth_User"].id
-    log_action("remove_permission: Removed permission \"$(permission.permission)\" (Permission ID: $(permission.id)) from user ID $(userId) at $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))", user["NebulaAuth_User"])
+    ts = Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS")
+    @async log_action(
+        "RemovePermissionFromUser: Removed permission \"$(permission.permission)\" (ID: $(permission.id)) from user ID $(user["NebulaAuth_User"].id) at $(ts)",
+        user["NebulaAuth_User"].id
+    )
     return true
 end
 
-function getUserPermissions(user_id::Int)
-    # Check if user exists
-    user = findFirst(NebulaAuth_User; query=Dict("where" => Dict("id" => user_id), "include" => [NebulaAuth_UserRole]))
+"""
+    GetUserPermissions(userId::Int) :: Vector{Any}
+
+Retorna todas as permissões associadas a um usuário (através de roles e relações diretas).
+"""
+function GetUserPermissions(userId::Int)::Vector{Any}
+    user = findFirst(NebulaAuth_User; query=Dict("where" => Dict("id" => userId), "include" => [NebulaAuth_UserRole]))
     if user === nothing
         error("User not found")
     end
 
-    # Get permissions assigned to the user
-    permissions = []
-    
-    # Get permissions for each role
+    permissions = Any[]
+    # Itera pelas roles do usuário para agregar permissões
     for role in user["NebulaAuth_UserRole"]
-        role_permissions = findMany(NebulaAuth_RolePermission; query=Dict("where" => Dict("roleId" => role.roleId)))
-        if role_permissions !== nothing
-            permissions = vcat(permissions, role_permissions)
+        rolePermissions = findMany(NebulaAuth_RolePermission; query=Dict("where" => Dict("roleId" => role.roleId)))
+        if rolePermissions !== nothing
+            permissions = vcat(permissions, rolePermissions)
         end
     end
-    # Remove duplicates
     permissions = unique(permissions)
 
-    # Get permissions directly assigned to role permissions
-
-    permissionsList = []
-    for perm in permissions
-        permission = findFirst(NebulaAuth_Permission; query=Dict("where" => Dict("id" => perm.permissionId)))
-        if permission !== nothing
-            permissionsList = vcat(permissionsList, permission)
+    permissionsList = Any[]
+    for rel in permissions
+        perm = findFirst(NebulaAuth_Permission; query=Dict("where" => Dict("id" => rel.permissionId)))
+        if perm !== nothing
+            permissionsList = vcat(permissionsList, perm)
         end
     end
 
-
-    # Log the action
-    log_action("get_user_permissions: Retrieved permissions for user ID $(user_id) at $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))", user["NebulaAuth_User"])
+    ts = Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS")
+    @async log_action(
+        "GetUserPermissions: Retrieved permissions for user ID $(userId) at $(ts)",
+        user["NebulaAuth_User"].id
+    )
     return permissionsList
 end
 
-function checkPermission(user_id::Int, permission::String)
-    # Check if user exists
-    user = findFirst(NebulaAuth_User; query=Dict("where" => Dict("id" => user_id)))
-    if user === nothing
-        error("User not found")
-    end
+"""
+    CheckUserPermission(userId::Int, permissionName::String) :: Bool
 
-    # Check if permission exists
-    permissions = getUserPermissions(user.id)
-    if isempty(permissions)
-        error("Permission not found")
-    end
-
-    # Check if user has the permission
+Verifica se um usuário possui uma permissão específica.
+"""
+function CheckUserPermission(userId::Int, permissionName::String)::Bool
+    user = FetchUser(userId)
+    permissions = GetUserPermissions(user.id)
     for perm in permissions
-        if perm.permission == permission
+        if perm.permission == permissionName
             return true
         end
     end
-    return false   
+    return false
 end
 
-
 """
-    syncRolesAndPermissions(roles::Dict{String, Vector{String}})
+    SyncRolesAndPermissions(rolesAndPermissions::Dict{String, Vector{String}}) :: Bool
 
-Sync roles and permissions from a Dict, creating any missing roles, permissions, and relations.
-
-Example:
-
+Sincroniza roles e permissões a partir de um Dict, criando registros e relações ausentes.
 """
-function syncRolesAndPermissions(roles::Dict{String, Vector{String}})
-    # Iterate over each role
-    for (role_name, permissions) in roles
-        # Check if the role already exists
-        role = findFirst(NebulaAuth_Role; query=Dict("where" => Dict("role" => role_name)))
+function SyncRolesAndPermissions(rolesAndPermissions::Dict{String, Vector{String}})::Bool
+    for (roleName, permissionList) in rolesAndPermissions
+        role = findFirst(NebulaAuth_Role; query=Dict("where" => Dict("role" => roleName)))
         if role === nothing
-            # Create the role if it doesn't exist
             role = create(NebulaAuth_Role, Dict(
-                "role" => role_name,
-                "description" => "Role: $role_name"
+                "role" => roleName,
+                "description" => "Role: $roleName"
             ))
         end
 
-        # Iterate over each permission for the role
-        for permission_name in permissions
-            # Check if the permission already exists
-            permission = findFirst(NebulaAuth_Permission; query=Dict("where" => Dict("permission" => permission_name)))
+        for permissionName in permissionList
+            permission = findFirst(NebulaAuth_Permission; query=Dict("where" => Dict("permission" => permissionName)))
             if permission === nothing
-                # Create the permission if it doesn't exist
                 permission = create(NebulaAuth_Permission, Dict(
-                    "permission" => permission_name,
-                    "description" => "Permission: $permission_name"
+                    "permission" => permissionName,
+                    "description" => "Permission: $permissionName"
                 ))
             end
 
-            # Check if the role-permission relation already exists
-            existing_relation = findFirst(NebulaAuth_RolePermission; query=Dict("where" => Dict("roleId" => role.id, "permissionId" => permission.id)))
-            if existing_relation === nothing
-                # Create the relation if it doesn't exist
+            existingRelation = findFirst(NebulaAuth_RolePermission; query=Dict("where" => Dict("roleId" => role.id, "permissionId" => permission.id)))
+            if existingRelation === nothing
                 create(NebulaAuth_RolePermission, Dict(
                     "roleId" => role.id,
                     "permissionId" => permission.id
@@ -249,6 +277,5 @@ function syncRolesAndPermissions(roles::Dict{String, Vector{String}})
             end
         end
     end
-
     return true
 end
