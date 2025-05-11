@@ -4,6 +4,7 @@ using Dates
 using DotEnv
 DotEnv.load!()
 
+using JSON3
 using NebulaORM
 
 using NebulaAuth
@@ -149,6 +150,63 @@ NebulaAuth.init!()
         @test CheckUserPermission(user.id, "read") == true
     end
 
+    @testset verbose=true "SignIn and SignUp - JWT" begin
+        @testset verbose=true "SignUp" begin
+            # Use signup function to get JWT and user
+            user, jwt = signup("eu@thiago.com", "Thiago Simões", "123456")
+            jwtStr = JSON3.parse(jwt)
+            # Check if JWT is generated
+            @test !isnothing(jwt)
+            # Decode JWT
+            decoded_payload = NebulaAuth.__NEBULA__DecodeJWT(jwtStr[:access_token])
+            # Check if payload contains expected fields
+            @test haskey(decoded_payload, "iat")
+            @test haskey(decoded_payload, "exp")
+
+            # Check if payload contains user information
+            @test decoded_payload["email"] == "eu@thiago.com"
+            @test decoded_payload["name"] == "Thiago Simões"
+
+            # Check if payload contains roles and permissions
+            @test haskey(decoded_payload, "roles")
+            @test haskey(decoded_payload, "permissions")
+
+            # Check if roles and permissions are empty
+            @test decoded_payload["roles"] == []
+            @test decoded_payload["permissions"] == []
+
+            # Check if expiration time is correct
+            @test decoded_payload["exp"] > decoded_payload["iat"]
+        end
+
+        @testset verbose=true "SignIn" begin
+            # Assign role to user
+            AssignRoleToUser(user.id, "admin")
+            # Check if user has role, using function
+            user_with_role = findFirst(NebulaAuth_User; query=Dict("where" => Dict("id" => user.id), "include" => [NebulaAuth_UserRole]))
+            @test user_with_role !== nothing
+            @test user_with_role["NebulaAuth_UserRole"][1].userId == user.id
+            # Check if user has role, using function
+            @test (NebulaAuth.GetUserPermissions(user.id) .|> (x -> x.permission)) == ["read", "write", "delete"]
+            # Use signin function to get JWT and user
+            user, jwt = signin("eu@thiago.com", "123456")
+            jwtStr = JSON3.parse(jwt)
+            # Check if JWT is generated
+            @test !isnothing(jwt)
+            # Decode JWT
+            decoded_payload = NebulaAuth.__NEBULA__DecodeJWT(jwtStr[:access_token])
+            # Check if payload contains expected fields
+            @test haskey(decoded_payload, "iat")
+            @test haskey(decoded_payload, "exp")
+
+            # Getroles from database for know name and id
+            role = findFirst(NebulaAuth_Role; query=Dict("where" => Dict("role" => "admin")))
+
+            # Check roles
+            @test decoded_payload["roles"][1][:roleId] == role.id
+            @test (decoded_payload["permissions"] .|> (x -> x.permission)) == ["read", "write", "delete"]
+        end
+    end
 end
 
 conn = dbConnection()

@@ -59,7 +59,7 @@ function __NEBULA__Sign(
     algorithm::AbstractString
 )::AbstractString
     if algorithm == "HS256"
-        return base64url_encode(hexdigest("sha256", secret, "$headerEncoded.$payloadEncoded"))
+        return base64url_encode(hexdigest("sha256", secret, "$headerEncoded.$payloadEncoded")) # hexdigest with secret is HMAC implementation
     else
         error("Unsupported algorithm: $algorithm")
     end

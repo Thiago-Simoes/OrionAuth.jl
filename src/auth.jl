@@ -1,11 +1,9 @@
 
-# Função para registrar log de ação.
 function log_action(action::String, userId::Int)
     ts = string(Dates.now())
     return create(NebulaAuth_Log, Dict("userId"=>userId, "action"=>action, "timestamp"=>ts))
 end
 
-# Altered signup function using module-level NebulaAuth_User.
 function signup(email::String, name::String, password::String)
     existing = findFirst(NebulaAuth_User; query=Dict("where" => Dict("email" => email)))
     if existing !== nothing
@@ -33,7 +31,6 @@ function signup(email::String, name::String, password::String)
     return newUser, returnData
 end
 
-# Altered signin function with password verification.
 function signin(email::String, password::String)
     local user = findFirst(NebulaAuth_User; query=Dict("where" => Dict("email" => email)))
     if user === nothing
@@ -58,6 +55,6 @@ end
 
 function generateJWT(user)
     payload = Dict("sub" => user.id, "name" => user.name, "email" => user.email, "uuid" => user.uuid, "roles" => GetUserRoles(user.id), "permissions" => GetUserPermissions(user.id))
-    token = __NEBULA__EncodeJWT(payload, ENV["NEBULAAUTH_SECRET"])
+    token = __NEBULA__EncodeJWT(payload, ENV["NEBULAAUTH_SECRET"], ENV["NEBULAAUTH_ALGORITHM"])
     return token
 end
