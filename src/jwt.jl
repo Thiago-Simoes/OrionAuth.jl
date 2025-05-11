@@ -5,6 +5,7 @@
 
 using JSON3
 using Base64
+using Nettle
 
 function __NEBULA__EncodeJWT(inputPayload::Dict, secret::AbstractString, algorithm::AbstractString="HS256")
     header = Dict("alg" => algorithm, "typ" => "JWT")
@@ -35,6 +36,10 @@ function __NEBULA__DecodeJWT(token::AbstractString, secret::AbstractString = ENV
     header = JSON3.read(base64url_decode2string(headerEncoded))
     payload = JSON3.read(base64url_decode2string(payloadEncoded))
 
+    if header["alg"] != ENV["NEBULAAUTH_ALGORITHM"]
+        error("Invalid JWT algorithm")
+    end
+    
     verified = __NEBULA__Verify(headerEncoded, payloadEncoded, signature, ENV["NEBULAAUTH_SECRET"], header["alg"])
 
     if !haskey(payload, "exp")
@@ -59,7 +64,15 @@ function __NEBULA__Sign(
     algorithm::AbstractString
 )::AbstractString
     if algorithm == "HS256"
-        return base64url_encode(hexdigest("sha256", secret, "$headerEncoded.$payloadEncoded")) # hexdigest with secret is HMAC implementation
+        h = HMACState("sha256", secret)
+        Nettle.update!(h, "$headerEncoded.$payloadEncoded")
+        
+        return base64url_encode(Nettle.digest!(h)) # digest! returns a vector of UInt8
+    elseif algorithm == "HS512"
+        h = HMACState("sha512", secret)
+        Nettle.update!(h, "$headerEncoded.$payloadEncoded")
+
+        return base64url_encode(Nettle.digest!(h)) # digest! returns a vector of UInt8
     else
         error("Unsupported algorithm: $algorithm")
     end

@@ -1,5 +1,9 @@
 # Changelog
 
+## [0.9.0] - Pre-release version
+- Ensure NEBULAAUTH_ALGORITHM environment variable is validated and matches supported HMAC algorithms in code.
+
+
 ## [0.2.0]
 ## Added
 - Implementation of JWT for secure session handling.
@@ -29,9 +33,7 @@
 
 ## Security Improvements - for prod-ready
 - Use constant-time comparison functions for password and JWT signature verification.
-- Ensure NEBULAAUTH_ALGORITHM environment variable is validated and matches supported HMAC algorithms in code.
 - Implement refresh token mechanism with unique JWT ID (jti) and blacklist support for immediate revocation.
-- Add standard JWT claims: iss (issuer), aud (audience), jti (JWT ID), and nbf (not before).
 - Migrate password hashing to a modern KDF (Argon2id or bcrypt) instead of iterated SHA-512.
 - Enforce rate limiting and account lockout after configurable failed login attempts.
 - Support multi-factor authentication (e.g., TOTP) for enhanced account security.

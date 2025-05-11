@@ -131,7 +131,8 @@ NebulaAuth.init!()
 
         SyncRolesAndPermissions(Dict(
             "admin" => ["read", "write", "delete"],
-            "user" => ["read"]
+            "user" => ["read"],
+            "god" => ["read", "write", "delete", "sudo"]
         ))
 
         role_permission = findFirst(NebulaAuth_RolePermission; query=Dict("where" => Dict("roleId" => role.id, "permissionId" => parent_permission.id)))
@@ -148,6 +149,16 @@ NebulaAuth.init!()
 
         @test NebulaAuth.GetUserPermissions(user.id) .|> (x -> x.permission) == ["read", "write", "delete"]
         @test CheckUserPermission(user.id, "read") == true
+    end
+
+    @testset verbose=true "Permissions - Direct permission" begin
+        # Add direct permission to user
+        AssignPermissionToUser(user.id, "sudo")
+        user_with_permission = findFirst(NebulaAuth_User; query=Dict("where" => Dict("id" => user.id), "include" => [NebulaAuth_UserPermission]))
+        @test user_with_permission !== nothing
+        @test user_with_permission["NebulaAuth_UserPermission"][1].userId == user.id
+        @test NebulaAuth.GetUserPermissions(user.id) .|> (x -> x.permission) == ["read", "write", "delete", "sudo"]
+        @test CheckUserPermission(user.id, "sudo") == true
     end
 
     @testset verbose=true "SignIn and SignUp - JWT" begin

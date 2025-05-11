@@ -203,7 +203,6 @@ function GetUserPermissions(userId::Int)::Vector{Any}
     end
 
     permissions = Any[]
-    # Itera pelas roles do usuário para agregar permissões
     for role in user["NebulaAuth_UserRole"]
         rolePermissions = findMany(NebulaAuth_RolePermission; query=Dict("where" => Dict("roleId" => role.roleId)))
         if rolePermissions !== nothing
@@ -214,6 +213,14 @@ function GetUserPermissions(userId::Int)::Vector{Any}
 
     permissionsList = Any[]
     for rel in permissions
+        perm = findFirst(NebulaAuth_Permission; query=Dict("where" => Dict("id" => rel.permissionId)))
+        if perm !== nothing
+            permissionsList = vcat(permissionsList, perm)
+        end
+    end
+
+    userPermissions = findMany(NebulaAuth_UserPermission; query=Dict("where" => Dict("userId" => userId)))
+    for rel in userPermissions
         perm = findFirst(NebulaAuth_Permission; query=Dict("where" => Dict("id" => rel.permissionId)))
         if perm !== nothing
             permissionsList = vcat(permissionsList, perm)
