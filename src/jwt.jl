@@ -39,7 +39,7 @@ function __NEBULA__DecodeJWT(token::AbstractString, secret::AbstractString = ENV
     if header["alg"] != ENV["NEBULAAUTH_ALGORITHM"]
         error("Invalid JWT algorithm")
     end
-    
+
     verified = __NEBULA__Verify(headerEncoded, payloadEncoded, signature, ENV["NEBULAAUTH_SECRET"], header["alg"])
 
     if !haskey(payload, "exp")
@@ -85,7 +85,7 @@ function __NEBULA__Verify(
     secret::AbstractString,
     algorithm::AbstractString
 )::Bool
-    if algorithm == "HS256"
+    if algorithm in ["HS256", "HS512"]
         expectedSignature = __NEBULA__Sign(headerEncoded, payloadEncoded, secret, algorithm)
         return expectedSignature == signature
     else
