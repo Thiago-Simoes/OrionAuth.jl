@@ -15,7 +15,7 @@ NebulaAuth is a lightweight authentication package written in Julia, designed fo
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/youruser/NebulaAuth.jl.git
+   git clone https://github.com/Thiago-Simoes/NebulaAuth.jl.git
    ```
 2. Change to the project directory:
    ```bash
