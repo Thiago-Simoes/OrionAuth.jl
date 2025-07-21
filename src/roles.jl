@@ -7,13 +7,13 @@ Assign a role to a user.
 function assignRole(user_id::Int, role::String)
     # Check if user exists
     user = findFirst(NebulaAuth_User; query=Dict("where" => Dict("id" => user_id)))
-    if isnothing(user)
+    if user === nothing
         error("User not found")
     end
 
     # Check if role exists
     role = findFirst(NebulaAuth_Role; query=Dict("where" => Dict("role" => role)))
-    if isnothing(role)
+    if role === nothing
         error("Role not found")
     end
 
@@ -37,19 +37,19 @@ end
 function removeRole(user_id::Int, role::String)
     # Check if user exists
     user = findFirst(NebulaAuth_User; query=Dict("where" => Dict("id" => user_id)))
-    if isnothing(user)
+    if user === nothing
         error("User not found")
     end
 
     # Check if role exists
     role = findFirst(NebulaAuth_Role; query=Dict("where" => Dict("role" => role)))
-    if isnothing(role)
+    if role === nothing
         error("Role not found")
     end
 
     # Check if user has the role
     existing = findFirst(NebulaAuth_UserRole; query=Dict("where" => Dict("userId" => user_id, "roleId" => role.id)))
-    if isnothing(existing)
+    if existing === nothing
         error("User does not have this role")
     end
 
@@ -64,7 +64,7 @@ end
 function getUserRoles(user_id::Int)
     # Check if user exists
     user = findFirst(NebulaAuth_User; query=Dict("where" => Dict("id" => user_id), "include" => [NebulaAuth_UserRole]))
-    if isnothing(user)
+    if user === nothing
         error("User not found")
     end
 
@@ -83,7 +83,7 @@ end
 function assignPermission(user_id::Int, permission::String)
     # Check if user exists
     user = findFirst(NebulaAuth_User; query=Dict("where" => Dict("id" => user_id), "include" => [NebulaAuth_UserPermission]))
-    if isnothing(user)
+    if user === nothing
         error("User not found")
     end
 
@@ -119,7 +119,7 @@ end
 function removePermission(user_id::Int, permission::String)
     # Check if user exists
     user = findFirst(NebulaAuth_User; query=Dict("where" => Dict("id" => user_id), "include" => [NebulaAuth_UserPermission]))
-    if isnothing(user)
+    if user === nothing
         error("User not found")
     end
 
@@ -149,7 +149,7 @@ end
 function getUserPermissions(user_id::Int)
     # Check if user exists
     user = findFirst(NebulaAuth_User; query=Dict("where" => Dict("id" => user_id), "include" => [NebulaAuth_UserRole]))
-    if isnothing(user)
+    if user === nothing
         error("User not found")
     end
 
@@ -185,7 +185,7 @@ end
 function checkPermission(user_id::Int, permission::String)
     # Check if user exists
     user = findFirst(NebulaAuth_User; query=Dict("where" => Dict("id" => user_id)))
-    if isnothing(user)
+    if user === nothing
         error("User not found")
     end
 
@@ -218,7 +218,7 @@ function syncRolesAndPermissions(roles::Dict{String, Vector{String}})
     for (role_name, permissions) in roles
         # Check if the role already exists
         role = findFirst(NebulaAuth_Role; query=Dict("where" => Dict("role" => role_name)))
-        if isnothing(role)
+        if role === nothing
             # Create the role if it doesn't exist
             role = create(NebulaAuth_Role, Dict(
                 "role" => role_name,
@@ -230,15 +230,18 @@ function syncRolesAndPermissions(roles::Dict{String, Vector{String}})
         for permission_name in permissions
             # Check if the permission already exists
             permission = findFirst(NebulaAuth_Permission; query=Dict("where" => Dict("permission" => permission_name)))
-            if isnothing(permission)
+            if permission === nothing
+                # Create the permission if it doesn't exist
                 permission = create(NebulaAuth_Permission, Dict(
                     "permission" => permission_name,
                     "description" => "Permission: $permission_name"
                 ))
             end
 
+            # Check if the role-permission relation already exists
             existing_relation = findFirst(NebulaAuth_RolePermission; query=Dict("where" => Dict("roleId" => role.id, "permissionId" => permission.id)))
             if existing_relation === nothing
+                # Create the relation if it doesn't exist
                 create(NebulaAuth_RolePermission, Dict(
                     "roleId" => role.id,
                     "permissionId" => permission.id
