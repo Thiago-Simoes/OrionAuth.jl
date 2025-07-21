@@ -6,9 +6,9 @@
   ```julia
   import Pkg
   Pkg.activate(".")
-  Pkg.add("https://github.com/Thiago-Simoes/NebulaAuth.jl")
+  Pkg.add("https://github.com/Thiago-Simoes/OrionAuth.jl")
 
-  using NebulaAuth
+  using OrionAuth
 
   ```
 
@@ -22,32 +22,32 @@ DB_NAME=dbname
 DB_PORT=3306
 
 NebulaORM_LOG_LEVEL=error
-NEBULAAUTH_SECRET=your_secret_key_here
-NEBULAAUTH_ALGORITHM=HS512
-NEBULAAUTH_EXPIRATION=3600
-NEBULAAUTH_ISSUER=NebulaAuth
-NEBULAAUTH_DBPREFIX=NebulaAuth_
-NEBULAAUTH_MIN_PASSWORD_ITTERATIONS=25000
+OrionAuth_SECRET=your_secret_key_here
+OrionAuth_ALGORITHM=HS512
+OrionAuth_EXPIRATION=3600
+OrionAuth_ISSUER=OrionAuth
+OrionAuth_DBPREFIX=OrionAuth_
+OrionAuth_MIN_PASSWORD_ITTERATIONS=25000
 ```
 
 ## Initializing the Package
-In your Julia script or REPL, load and initialize NebulaAuth:
+In your Julia script or REPL, load and initialize OrionAuth:
 ```julia
-using NebulaAuth
-NebulaAuth.init!()  # Loads all modules, including auth and JWT.
+using OrionAuth
+OrionAuth.init!()  # Loads all modules, including auth and JWT.
 ```
 
 ## User Operations
 ### Signing Up
 Create a new user with:
 ```julia
-user = NebulaAuth.signup("user@example.com", "John Doe", "securePassword123")
+user = OrionAuth.signup("user@example.com", "John Doe", "securePassword123")
 println("User created with UUID: ", user.uuid)
 ```
 
 ### Signing In
 Authenticate a user with:
 ```julia
-user = NebulaAuth.signin("user@example.com", "securePassword123")
+user = OrionAuth.signin("user@example.com", "securePassword123")
 println("User signed in successfully!")
 ```

@@ -4,13 +4,13 @@
 
 ## Supported Versions
 
-Only the latest released version of NebulaAuth.jl is actively maintained with security updates.
+Only the latest released version of OrionAuth.jl is actively maintained with security updates.
 
 ## Reporting a Vulnerability
 
 To report a security vulnerability, use **GitHub Security Advisories**:
 
-[Report a vulnerability](https://github.com/Thiago-Simoes/NebulaAuth.jl/security/advisories)
+[Report a vulnerability](https://github.com/Thiago-Simoes/OrionAuth.jl/security/advisories)
 
 Do **not** open issues or pull requests for security concerns.
 

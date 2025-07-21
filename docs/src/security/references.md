@@ -1,6 +1,6 @@
 # Security References
 
-This document consolidates all official standards, guidelines, and references used to design and enforce the NebulaAuth.jl security model.
+This document consolidates all official standards, guidelines, and references used to design and enforce the OrionAuth.jl security model.
 
 ---
 

@@ -1,6 +1,6 @@
-# NebulaAuth Documentation
+# OrionAuth Documentation
 
-NebulaAuth is a lightweight authentication package written in Julia, designed for secure, scalable applications. It offers user creation, sign-in, JWT-based session handling, secure password hashing (SHA512 with salt), extensive logging, and auditing capabilities.
+OrionAuth is a lightweight authentication package written in Julia, designed for secure, scalable applications. It offers user creation, sign-in, JWT-based session handling, secure password hashing (SHA512 with salt), extensive logging, and auditing capabilities.
 
 ## Table of Contents
 - [Installation](#installation)
@@ -15,11 +15,11 @@ NebulaAuth is a lightweight authentication package written in Julia, designed fo
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/Thiago-Simoes/NebulaAuth.jl.git
+   git clone https://github.com/Thiago-Simoes/OrionAuth.jl.git
    ```
 2. Change to the project directory:
    ```bash
-   cd NebulaAuth.jl
+   cd OrionAuth.jl
    ```
 3. Activate and instantiate packages in Julia:
    ```julia
@@ -39,13 +39,13 @@ DB_NAME=dbname
 DB_PORT=3306
 
 NebulaORM_LOG_LEVEL=error
-NEBULAAUTH_SECRET=your_secret_key_here
-NEBULAAUTH_ALGORITHM=HS512
-NEBULAAUTH_EXPIRATION=3600
-NEBULAAUTH_ISSUER=NebulaAuth
-NEBULAAUTH_DBPREFIX=NebulaAuth_
-NEBULAAUTH_MIN_PASSWORD_ITTERATIONS=25000
-NEBULAAUTH_JWT_EXP=30 # in minutes
+OrionAuth_SECRET=your_secret_key_here
+OrionAuth_ALGORITHM=HS512
+OrionAuth_EXPIRATION=3600
+OrionAuth_ISSUER=OrionAuth
+OrionAuth_DBPREFIX=OrionAuth_
+OrionAuth_MIN_PASSWORD_ITTERATIONS=25000
+OrionAuth_JWT_EXP=30 # in minutes
 ```
 Customize these settings based on your production environment.
 
@@ -55,23 +55,23 @@ Customize these settings based on your production environment.
 
 Initialize all modules and ORM models:
 ```julia
-using NebulaAuth
-NebulaAuth.init!()  # Loads modules such as auth.jl and jwt.jl.
+using OrionAuth
+OrionAuth.init!()  # Loads modules such as auth.jl and jwt.jl.
 ```
 
 ### Signing Up and Signing In
 
 Create a new user with secure password hashing:
 ```julia
-using NebulaAuth
-user = NebulaAuth.signup("user@example.com", "John Doe", "securePassword123")
+using OrionAuth
+user = OrionAuth.signup("user@example.com", "John Doe", "securePassword123")
 println("User created with UUID: ", user.uuid)
 ```
 
 Authenticate an existing user:
 ```julia
-using NebulaAuth
-user = NebulaAuth.signin("user@example.com", "securePassword123")
+using OrionAuth
+user = OrionAuth.signin("user@example.com", "securePassword123")
 println("User signed in successfully!")
 ```
 
@@ -79,9 +79,9 @@ println("User signed in successfully!")
 
 Generate and verify JWT tokens for session management:
 ```julia
-using NebulaAuth.JWT  # Ensure that the JWT module is included.
-token = NebulaAuth.JWT.create_token(user)
-verified = NebulaAuth.JWT.verify_token(token)
+using OrionAuth.JWT  # Ensure that the JWT module is included.
+token = OrionAuth.JWT.create_token(user)
+verified = OrionAuth.JWT.verify_token(token)
 println("JWT Verified: ", verified)
 ```
 

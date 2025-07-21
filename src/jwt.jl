@@ -12,7 +12,7 @@ function __NEBULA__EncodeJWT(inputPayload::Dict, secret::AbstractString, algorit
     headerEncoded = base64encode(JSON3.write(header))
 
     iat = round(Int, time())
-    exp = iat + (parse(Int, ENV["NEBULAAUTH_JWT_EXP"]) * 60)
+    exp = iat + (parse(Int, ENV["OrionAuth_JWT_EXP"]) * 60)
     payload = Dict("sub" => inputPayload["sub"], "name" => inputPayload["name"], "iat" => iat, "exp" => exp)
 
     for key in ("email", "uuid", "roles", "permissions")
@@ -22,11 +22,11 @@ function __NEBULA__EncodeJWT(inputPayload::Dict, secret::AbstractString, algorit
     end
 
     payload_encoded = base64url_encode(JSON3.write(payload))
-    signature = __NEBULA__Sign(headerEncoded, payload_encoded, ENV["NEBULAAUTH_SECRET"], algorithm)
+    signature = __NEBULA__Sign(headerEncoded, payload_encoded, ENV["OrionAuth_SECRET"], algorithm)
     return "$headerEncoded.$payload_encoded.$signature"
 end
 
-function __NEBULA__DecodeJWT(token::AbstractString, secret::AbstractString = ENV["NEBULAAUTH_SECRET"])
+function __NEBULA__DecodeJWT(token::AbstractString, secret::AbstractString = ENV["OrionAuth_SECRET"])
     parts = split(token, ".")
     if length(parts) != 3
         error("Invalid JWT format")
@@ -36,11 +36,11 @@ function __NEBULA__DecodeJWT(token::AbstractString, secret::AbstractString = ENV
     header = JSON3.read(base64url_decode2string(headerEncoded))
     payload = JSON3.read(base64url_decode2string(payloadEncoded))
 
-    if header["alg"] != ENV["NEBULAAUTH_ALGORITHM"]
+    if header["alg"] != ENV["OrionAuth_ALGORITHM"]
         error("Invalid JWT algorithm")
     end
 
-    verified = __NEBULA__Verify(headerEncoded, payloadEncoded, signature, ENV["NEBULAAUTH_SECRET"], header["alg"])
+    verified = __NEBULA__Verify(headerEncoded, payloadEncoded, signature, ENV["OrionAuth_SECRET"], header["alg"])
 
     if !haskey(payload, "exp")
         error("JWT does not contain expiration time")

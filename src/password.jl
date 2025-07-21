@@ -4,7 +4,7 @@ using SHA
 # Utils for password validation and hashing
 function __NEBULA__HashPassword(password::String)
     generateSalt = Random.randstring(RandomDevice(), 32)
-    nIterations = rand(parse(Int, ENV["NEBULAAUTH_MIN_PASSWORD_ITTERATIONS"]):(parse(Int, ENV["NEBULAAUTH_MIN_PASSWORD_ITTERATIONS"])*2))
+    nIterations = rand(parse(Int, ENV["OrionAuth_MIN_PASSWORD_ITTERATIONS"]):(parse(Int, ENV["OrionAuth_MIN_PASSWORD_ITTERATIONS"])*2))
 
     hashed = "$(password)&$(generateSalt)"
     for i in 1:nIterations

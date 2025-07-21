@@ -1,4 +1,4 @@
-module NebulaAuth
+module OrionAuth
 
 using Base64
 using DataFrames
@@ -26,8 +26,8 @@ function init!()
     include(joinpath(dir, "jwt.jl"))
 
     @eval begin
-        NebulaAuth_Log = Model(
-            :NebulaAuth_Log,
+        OrionAuth_Log = Model(
+            :OrionAuth_Log,
             [
                 ("id", INTEGER(), [PrimaryKey(), AutoIncrement()]),
                 ("userId", INTEGER(), []),
@@ -36,8 +36,8 @@ function init!()
             ]
         )
         
-        NebulaAuth_User = Model(
-            :NebulaAuth_User,
+        OrionAuth_User = Model(
+            :OrionAuth_User,
             [
                 ("id",         INTEGER(), [PrimaryKey(), AutoIncrement()]),
                 ("email",      TEXT(),    []),
@@ -49,8 +49,8 @@ function init!()
             ]
         )
 
-        NebulaAuth_Permission = Model(
-            :NebulaAuth_Permission,
+        OrionAuth_Permission = Model(
+            :OrionAuth_Permission,
             [
                 ("id", INTEGER(), [PrimaryKey(), AutoIncrement()]),
                 ("permission", VARCHAR(100), []),
@@ -59,8 +59,8 @@ function init!()
             ]
         )
         
-        NebulaAuth_Role = Model(
-            :NebulaAuth_Role,
+        OrionAuth_Role = Model(
+            :OrionAuth_Role,
             [
                 ("id", INTEGER(), [PrimaryKey(), AutoIncrement()]),
                 ("role", VARCHAR(100), []),
@@ -69,8 +69,8 @@ function init!()
             ]
         )
 
-        NebulaAuth_RolePermission = Model(
-            :NebulaAuth_RolePermission,
+        OrionAuth_RolePermission = Model(
+            :OrionAuth_RolePermission,
             [
                 ("id", INTEGER(), [PrimaryKey(), AutoIncrement()]),
                 ("roleId", INTEGER(), []),
@@ -78,13 +78,13 @@ function init!()
                 ("created_at", TIMESTAMP(), [Default("CURRENT_TIMESTAMP()")])
             ],
             [
-                ("roleId", NebulaAuth_Role, "id", :belongsTo),
-                ("permissionId", NebulaAuth_Permission, "id", :belongsTo)
+                ("roleId", OrionAuth_Role, "id", :belongsTo),
+                ("permissionId", OrionAuth_Permission, "id", :belongsTo)
             ]
         )
 
-        NebulaAuth_UserRole = Model(
-            :NebulaAuth_UserRole,
+        OrionAuth_UserRole = Model(
+            :OrionAuth_UserRole,
             [
                 ("id", INTEGER(), [PrimaryKey(), AutoIncrement()]),
                 ("userId", INTEGER(), []),
@@ -92,13 +92,13 @@ function init!()
                 ("created_at", TIMESTAMP(), [Default("CURRENT_TIMESTAMP()")])
             ],
             [
-                ("userId", NebulaAuth_User, "id", :belongsTo),
-                ("roleId", NebulaAuth_Role, "id", :belongsTo)
+                ("userId", OrionAuth_User, "id", :belongsTo),
+                ("roleId", OrionAuth_Role, "id", :belongsTo)
             ]
         )
 
-        NebulaAuth_UserPermission = Model(
-            :NebulaAuth_UserPermission,
+        OrionAuth_UserPermission = Model(
+            :OrionAuth_UserPermission,
             [
                 ("id", INTEGER(), [PrimaryKey(), AutoIncrement()]),
                 ("userId", INTEGER(), []),
@@ -106,13 +106,13 @@ function init!()
                 ("created_at", TIMESTAMP(), [Default("CURRENT_TIMESTAMP()")])
             ],
             [
-                ("userId", NebulaAuth_User, "id", :belongsTo),
-                ("permissionId", NebulaAuth_Permission, "id", :belongsTo)
+                ("userId", OrionAuth_User, "id", :belongsTo),
+                ("permissionId", OrionAuth_Permission, "id", :belongsTo)
             ]
         )
 
-        NebulaAuth_EmailVerification = Model(
-            :NebulaAuth_EmailVerification,
+        OrionAuth_EmailVerification = Model(
+            :OrionAuth_EmailVerification,
             [
                 ("id", INTEGER(), [PrimaryKey(), AutoIncrement()]),
                 ("userId", INTEGER(), []),
@@ -121,8 +121,8 @@ function init!()
             ]
         )
 
-        NebulaAuth_PasswordReset = Model(
-            :NebulaAuth_PasswordReset,
+        OrionAuth_PasswordReset = Model(
+            :OrionAuth_PasswordReset,
             [
                 ("id", INTEGER(), [PrimaryKey(), AutoIncrement()]),
                 ("userId", INTEGER(), []),
@@ -136,6 +136,6 @@ function init!()
     nothing
 end
 
-export NebulaAuth_User, signin, signup, syncRolesPermissions, AssignRoleToUser, AssignPermissionToUser, SyncRolesAndPermissions, GetUserPermissions, CheckUserPermission, removeRole
+export OrionAuth_User, signin, signup, syncRolesPermissions, AssignRoleToUser, AssignPermissionToUser, SyncRolesAndPermissions, GetUserPermissions, GetUserRoles, CheckUserPermission, RemoveRole
 
-end # module NebulaAuth
+end # module OrionAuth

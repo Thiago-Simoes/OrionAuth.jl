@@ -1,4 +1,4 @@
-# NebulaAuth.jl
+# OrionAuth.jl
 *Easy Authentication for Genie APIs.*
 
 # Package Features

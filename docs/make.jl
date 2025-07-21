@@ -1,11 +1,11 @@
 import Pkg
 Pkg.activate(".")
-using Documenter, NebulaAuth
+using Documenter, OrionAuth
 
 push!(LOAD_PATH,"../src/")
 makedocs(
-    sitename="NebulaAuth.jl",
-    modules=[NebulaAuth],
+    sitename="OrionAuth.jl",
+    modules=[OrionAuth],
     pages = [
     "Home" => "index.md",
     "Manual" => ["manual/start.md", "manual/relationships.md", "manual/security.md"],

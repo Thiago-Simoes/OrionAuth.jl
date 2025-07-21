@@ -1,6 +1,6 @@
 # Threat Model
 
-This document outlines the primary threat scenarios considered during the design of NebulaAuth.jl. It explicitly defines attack vectors covered and those delegated to integrators.
+This document outlines the primary threat scenarios considered during the design of OrionAuth.jl. It explicitly defines attack vectors covered and those delegated to integrators.
 
 ---
 

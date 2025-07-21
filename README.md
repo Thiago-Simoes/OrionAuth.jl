@@ -1,4 +1,4 @@
-# NebulaAuth.jl
+# OrionAuth.jl
 
 ## Objective
 
@@ -12,13 +12,13 @@ The package can be installed with the Julia package manager.
 From the Julia REPL, type `]` to enter the Pkg REPL mode and run:
 
 ```
-pkg> add "https://github.com/Thiago-Simoes/NebulaAuth.jl"
+pkg> add "https://github.com/Thiago-Simoes/OrionAuth.jl"
 ```
 
 Or, equivalently, via the `Pkg` API:
 
 ```julia
-julia> import Pkg; Pkg.add("https://github.com/Thiago-Simoes/NebulaAuth.jl")
+julia> import Pkg; Pkg.add("https://github.com/Thiago-Simoes/OrionAuth.jl")
 ```
 
 ## Documentation
@@ -44,6 +44,6 @@ If you discover any **vulnerabilities**, please report them via issues.
 $ julia --project make.jl
 
 ## License
-NebulaAuth is distributed in the hope that it will be useful,
+OrionAuth is distributed in the hope that it will be useful,
 but WITHOUT ANY WARRANTY; without even the implied warranty of
 MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.

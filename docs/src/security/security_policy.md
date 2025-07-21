@@ -1,8 +1,8 @@
-# NebulaAuth Security Policy
+# OrionAuth Security Policy
 
 ## Overview
 
-NebulaAuth.jl is designed to provide simple and robust authentication and authorization mechanisms. This document outlines the security objectives, methodologies, enforced practices, limitations, and future plans.
+OrionAuth.jl is designed to provide simple and robust authentication and authorization mechanisms. This document outlines the security objectives, methodologies, enforced practices, limitations, and future plans.
 
 ---
 
