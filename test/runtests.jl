@@ -1,18 +1,12 @@
-# Implementa os testes unitários para o módulo `ORM.jl` e suas dependências.
-
 using Test
 using Dates
+using JSON3
+using OrionORM
 
-using DotEnv
-DotEnv.load!()
+using OrionAuth
+OrionAuth.init!()
 
-using NebulaORM
-
-using NebulaAuth
-NebulaAuth.init!()
-
-@testset "NebulaAuth" begin
-    # Define um usuário de autenticação
+@testset "OrionAuth" begin
     user, jwt = signup("th.simoes@proton.me", "Thiago Simões", "123456")
     userLogging, jwt = signin("th.simoes@proton.me", "123456")
     @testset verbose=true "Authentication - Login/Register" begin
@@ -22,7 +16,6 @@ NebulaAuth.init!()
         @test userLogging.email == user.email
     end
 
-    # Relationship
     Model(
         :Profile,
         [
@@ -35,7 +28,7 @@ NebulaAuth.init!()
             ("updated_at", TEXT(), [])
         ],
         [
-            ("userId", NebulaAuth_User, "id", :belongsTo)
+            ("userId", OrionAuth_User, "id", :belongsTo)
         ]
     )
 
@@ -51,7 +44,7 @@ NebulaAuth.init!()
         @test profile.bio == "Software Engineer"
 
         # # Testar busca
-        profile_user = findFirst(NebulaAuth_User; query=Dict("where" => Dict("id" => profile.userId)))
+        profile_user = findFirst(OrionAuth_User; query=Dict("where" => Dict("id" => profile.userId)))
         @test profile_user !== nothing
         @test profile_user.id == user.id
 
@@ -62,13 +55,13 @@ NebulaAuth.init!()
         @test profile_user.userId == user.id
 
         # # Buscar pela relação
-        profile_user = findFirst(NebulaAuth_User; query=Dict("where" => Dict("id" => profile.userId), "include" => [Profile]))
+        profile_user = findFirst(OrionAuth_User; query=Dict("where" => Dict("id" => profile.userId), "include" => [Profile]))
         @test profile_user !== nothing
-        @test profile_user["NebulaAuth_User"].id == user.id
+        @test profile_user["OrionAuth_User"].id == user.id
         @test profile_user["Profile"][1].id == profile.id
     end
 
-    role = create(NebulaAuth_Role, Dict(
+    role = create(OrionAuth_Role, Dict(
         "role" => "admin",
         "description" => "Administrator role"
     ))
@@ -78,26 +71,22 @@ NebulaAuth.init!()
         @test role.role == "admin"
         @test role.description == "Administrator role"
 
-        # Testar busca
-        role = findFirst(NebulaAuth_Role; query=Dict("where" => Dict("role" => "admin")))
+        role = findFirst(OrionAuth_Role; query=Dict("where" => Dict("role" => "admin")))
         @test role !== nothing
         @test role.role == "admin"
 
-        # Assing role
-        assignRole(user.id, role.role)
-        # Testar busca
-        user_role = findFirst(NebulaAuth_UserRole; query=Dict("where" => Dict("userId" => user.id, "roleId" => role.id)))
+        AssignRole(user.id, role.role)
+        user_role = findFirst(OrionAuth_UserRole; query=Dict("where" => Dict("userId" => user.id, "roleId" => role.id)))
         @test user_role !== nothing
         @test user_role.userId == user.id
 
-        # Testar busca
-        user_with_role = findFirst(NebulaAuth_User; query=Dict("where" => Dict("id" => user.id), "include" => [NebulaAuth_UserRole]))
+        user_with_role = findFirst(OrionAuth_User; query=Dict("where" => Dict("id" => user.id), "include" => [OrionAuth_UserRole]))
         @test user_with_role !== nothing
-        @test user_with_role["NebulaAuth_UserRole"][1].userId == user.id
+        @test user_with_role["OrionAuth_UserRole"][1].userId == user.id
     end
 
     @testset verbose=true "Permissions - Create and assign" begin
-        permission = create(NebulaAuth_Permission, Dict(
+        permission = create(OrionAuth_Permission, Dict(
             "permission" => "read",
             "description" => "Read permission"
         ))
@@ -106,26 +95,22 @@ NebulaAuth.init!()
         @test permission.permission == "read"
         @test permission.description == "Read permission"
 
-        # Testar busca
-        permission = findFirst(NebulaAuth_Permission; query=Dict("where" => Dict("permission" => "read")))
+        permission = findFirst(OrionAuth_Permission; query=Dict("where" => Dict("permission" => "read")))
         @test permission !== nothing
         @test permission.permission == "read"
 
-        assignPermission(user.id, permission.permission)
-        # Testar busca
-        user_permission = findFirst(NebulaAuth_UserPermission; query=Dict("where" => Dict("userId" => user.id, "permissionId" => permission.id)))
+        AssignPermission(user.id, permission.permission)
+        user_permission = findFirst(OrionAuth_UserPermission; query=Dict("where" => Dict("userId" => user.id, "permissionId" => permission.id)))
         @test user_permission !== nothing
         @test user_permission.userId == user.id
 
-        # Testar busca
-        user_with_permission = findFirst(NebulaAuth_User; query=Dict("where" => Dict("id" => user.id), "include" => [NebulaAuth_UserPermission]))
+        user_with_permission = findFirst(OrionAuth_User; query=Dict("where" => Dict("id" => user.id), "include" => [OrionAuth_UserPermission]))
         @test user_with_permission !== nothing
-        @test user_with_permission["NebulaAuth_UserPermission"][1].userId == user.id
+        @test user_with_permission["OrionAuth_UserPermission"][1].userId == user.id
     end
 
     @testset verbose=true "Permissions - Inheritance" begin
-        # Criar uma permissão pai
-        parent_permission = create(NebulaAuth_Permission, Dict(
+        parent_permission = create(OrionAuth_Permission, Dict(
             "permission" => "write",
             "description" => "Write permission"
         ))
@@ -134,51 +119,132 @@ NebulaAuth.init!()
         @test parent_permission.permission == "write"
         @test parent_permission.description == "Write permission"
 
-        # Testar busca
-        parent_permission = findFirst(NebulaAuth_Permission; query=Dict("where" => Dict("permission" => "write")))
+        parent_permission = findFirst(OrionAuth_Permission; query=Dict("where" => Dict("permission" => "write")))
         @test parent_permission !== nothing
         @test parent_permission.permission == "write"
 
-        # Clean permission
-        deleteMany(NebulaAuth_UserPermission, Dict("where" => Dict("userId" => user.id)))
+        deleteMany(OrionAuth_UserPermission, Dict("where" => Dict("userId" => user.id)))
 
-        # Assign permission to role
-        syncRolesAndPermissions(Dict(
+        SyncRolesAndPermissions(Dict(
             "admin" => ["read", "write", "delete"],
-            "user" => ["read"]
+            "user" => ["read"],
+            "god" => ["read", "write", "delete", "sudo"]
         ))
 
-        # Testar busca
-        role_permission = findFirst(NebulaAuth_RolePermission; query=Dict("where" => Dict("roleId" => role.id, "permissionId" => parent_permission.id)))
+        role_permission = findFirst(OrionAuth_RolePermission; query=Dict("where" => Dict("roleId" => role.id, "permissionId" => parent_permission.id)))
         @test role_permission !== nothing
         @test role_permission.roleId == role.id
 
-        # Testar busca
-        role_with_permission = findFirst(NebulaAuth_Role; query=Dict("where" => Dict("id" => role.id), "include" => [NebulaAuth_RolePermission]))
+        role_with_permission = findFirst(OrionAuth_Role; query=Dict("where" => Dict("id" => role.id), "include" => [OrionAuth_RolePermission]))
         @test role_with_permission !== nothing
-        @test role_with_permission["NebulaAuth_RolePermission"][1].roleId == role.id
+        @test role_with_permission["OrionAuth_RolePermission"][1].roleId == role.id
 
-        # Testar busca
-        user_with_role_permission = findFirst(NebulaAuth_User; query=Dict("where" => Dict("id" => user.id), "include" => [NebulaAuth_UserRole]))
+        user_with_role_permission = findFirst(OrionAuth_User; query=Dict("where" => Dict("id" => user.id), "include" => [OrionAuth_UserRole]))
         @test user_with_role_permission !== nothing
-        @test user_with_role_permission["NebulaAuth_UserRole"][1].userId == user.id
+        @test user_with_role_permission["OrionAuth_UserRole"][1].userId == user.id
 
-        # Testar busca
-        @test NebulaAuth.getUserPermissions(user.id) .|> (x -> x.permission) == ["read", "write", "delete"]
-        @test checkPermission(user.id, "read") == true
+        permissions = OrionAuth.GetUserPermissions(user.id) .|> (x -> x.permission)
+        @test all(x in permissions for x in ["read", "write", "delete"])
+        @test CheckPermission(user.id, "read") == true
     end
 
+    @testset verbose=true "Permissions - Direct permission" begin
+        # Garantir que a permissão "sudo" existe
+        sudo_permission = findFirst(OrionAuth_Permission; query=Dict("where" => Dict("permission" => "sudo")))
+        if isnothing(sudo_permission)
+            sudo_permission = create(OrionAuth_Permission, Dict(
+                "permission" => "sudo",
+                "description" => "Sudo permission"
+            ))
+        end
+    
+        # Add direct permission to user
+        AssignPermission(user.id, "sudo")
+    
+        user_with_permission = findFirst(OrionAuth_User; query=Dict("where" => Dict("id" => user.id), "include" => [OrionAuth_UserPermission]))
+        @test user_with_permission !== nothing
+        @test user_with_permission["OrionAuth_UserPermission"][1].userId == user.id
+    
+        permissions = OrionAuth.GetUserPermissions(user.id) .|> (x -> x.permission)
+        @test all([x in permissions for x in ["read", "write", "delete", "sudo"]])
+        @test CheckPermission(user.id, "sudo") == true
+    end
+    
+    @testset verbose=true "SignIn and SignUp - JWT" begin
+        @testset verbose=true "SignUp" begin
+            # Use signup function to get JWT and user
+            user, jwt = signup("eu@thiago.com", "Thiago Simões", "123456")
+            jwtStr = JSON3.parse(jwt)
+            # Check if JWT is generated
+            @test !isnothing(jwt)
+            # Decode JWT
+            decoded_payload = OrionAuth.__ORION__DecodeJWT(jwtStr[:access_token])
+            # Check if payload contains expected fields
+            @test haskey(decoded_payload, "iat")
+            @test haskey(decoded_payload, "exp")
+
+            # Check if payload contains user information
+            @test decoded_payload["email"] == "eu@thiago.com"
+            @test decoded_payload["name"] == "Thiago Simões"
+
+            # Check if payload contains roles and permissions
+            @test haskey(decoded_payload, "roles")
+            @test haskey(decoded_payload, "permissions")
+
+            # Check if roles and permissions are empty
+            @test decoded_payload["roles"] == []
+            @test decoded_payload["permissions"] == []
+
+            # Check if expiration time is correct
+            @test decoded_payload["exp"] > decoded_payload["iat"]
+        end
+
+        @testset verbose=true "SignIn" begin
+            # Assign role to user
+            AssignRole(user.id, "admin")
+            # Check if user has role, using function
+            user_with_role = findFirst(OrionAuth_User; query=Dict("where" => Dict("id" => user.id), "include" => [OrionAuth_UserRole]))
+            @test user_with_role !== nothing
+            @test user_with_role["OrionAuth_UserRole"][1].userId == user.id
+            # Check if user has role, using function
+            permissions = OrionAuth.GetUserPermissions(user.id) .|> (x -> x.permission)
+            expected_permissions = ["read", "write", "delete"]
+            for perm in expected_permissions
+                @test perm in permissions
+            end
+            # Use signin function to get JWT and user
+            user, jwt = signin("eu@thiago.com", "123456")
+            jwtStr = JSON3.parse(jwt)
+            # Check if JWT is generated
+            @test !isnothing(jwt)
+            # Decode JWT
+            decoded_payload = OrionAuth.__ORION__DecodeJWT(jwtStr[:access_token])
+            # Check if payload contains expected fields
+            @test haskey(decoded_payload, "iat")
+            @test haskey(decoded_payload, "exp")
+
+            # Get roles from database for known name and id
+            role = findFirst(OrionAuth_Role; query=Dict("where" => Dict("role" => "admin")))
+
+            # Check roles
+            @test decoded_payload["roles"][1][:roleId] == role.id
+
+            jwt_permissions = decoded_payload["permissions"] .|> (x -> x.permission)
+            for perm in expected_permissions
+                @test perm in jwt_permissions
+            end
+        end
+    end
 end
 
-# Reset o banco de dados
 conn = dbConnection()
-dropTable!(conn, "NebulaAuth_User")
-dropTable!(conn, "NebulaAuth_Log")
+dropTable!(conn, "OrionAuth_User")
+dropTable!(conn, "OrionAuth_Log")
 dropTable!(conn, "Profile")
-dropTable!(conn, "NebulaAuth_Role")
-dropTable!(conn, "NebulaAuth_RolePermission")
-dropTable!(conn, "NebulaAuth_Permission")
-dropTable!(conn, "NebulaAuth_UserRole")
-dropTable!(conn, "NebulaAuth_UserPermission")
-dropTable!(conn, "NebulaAuth_EmailVerification")
-dropTable!(conn, "NebulaAuth_PasswordReset")
+dropTable!(conn, "OrionAuth_Role")
+dropTable!(conn, "OrionAuth_RolePermission")
+dropTable!(conn, "OrionAuth_Permission")
+dropTable!(conn, "OrionAuth_UserRole")
+dropTable!(conn, "OrionAuth_UserPermission")
+dropTable!(conn, "OrionAuth_EmailVerification")
+dropTable!(conn, "OrionAuth_PasswordReset")

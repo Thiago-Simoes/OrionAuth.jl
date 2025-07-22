@@ -5,11 +5,9 @@ using Base64
 
 Encode bytes to Base64URL (no padding).
 """
-function base64url_encode(input::AbstractVector{UInt8})
+function base64url_encode(input::AbstractVector{UInt8})::String
     encoded = base64encode(input)
-    # Substituir caracteres para Base64URL
     encoded = replace(encoded, "+" => "-", "/" => "_")
-    # Remover padding
     return replace(encoded, "=" => "")
 end
 
@@ -18,7 +16,7 @@ end
 
 Encode string to Base64URL.
 """
-function base64url_encode(input::String)
+function base64url_encode(input::String)::String
     return base64url_encode(codeunits(input))
 end
 
@@ -39,10 +37,10 @@ function base64url_decode(input::AbstractString)
 end
 
 """
-    base64url_decode_string(input::String)
+    base64url_decode2string(input::String)
 
 Decode Base64URL string back to original string.
 """
-function base64url_decode_string(input::AbstractString)
+function base64url_decode2string(input::AbstractString)
     return String(base64url_decode(input))
 end

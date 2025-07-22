@@ -1,6 +1,6 @@
 # Defining Relationships
 
-NebulaAuth leverages NebulaORM to create relationships between models. This manual explains how to create related models and query them.
+OrionAuth leverages OrionORM to create relationships between models. This manual explains how to create related models and query them.
 
 ## Creating Related Models
 You can define relationships by specifying association attributes when creating a model. For example, defining a `Profile` linked to a user:
@@ -18,7 +18,7 @@ Model(
         ("updated_at", TIMESTAMP(), [Default("CURRENT_TIMESTAMP()")])
     ],
     [
-        ("userId", NebulaAuth_User, "id", :belongsTo)
+        ("userId", OrionAuth_User, "id", :belongsTo)
     ]
 )
 ```
@@ -41,6 +41,6 @@ profile = create(Profile, Dict(
   ```
 - Include the related model when querying a user:
   ```julia
-  profile_user_with_relation = findFirst(NebulaAuth_User; query=Dict("where" => Dict("id" => profile.userId), "include" => [Profile]))
+  profile_user_with_relation = findFirst(OrionAuth_User; query=Dict("where" => Dict("id" => profile.userId), "include" => [Profile]))
   ```
 This will return a user record with an embedded list of related profiles.

@@ -5,46 +5,51 @@
 
 using JSON3
 using Base64
+using Nettle
 
-function __NEBULA__EncodeJWT(inputPayload::Dict, secret::AbstractString, algorithm::AbstractString="HS256")
+function __ORION__EncodeJWT(inputPayload::Dict, secret::AbstractString, algorithm::AbstractString="HS256")
     header = Dict("alg" => algorithm, "typ" => "JWT")
-    header_encoded = base64encode(JSON3.write(header))
+    headerEncoded = base64encode(JSON3.write(header))
 
-    # Encode payload
     iat = round(Int, time())
-    exp = iat + (parse(Int, ENV["NEBULAAUTH_JWT_EXP"]) * 60)
+    exp = iat + (parse(Int, ENV["OrionAuth_JWT_EXP"]) * 60)
     payload = Dict("sub" => inputPayload["sub"], "name" => inputPayload["name"], "iat" => iat, "exp" => exp)
-    if haskey(inputPayload, "email")
-        payload["email"] = inputPayload["email"]
-    end
 
-    if haskey(inputPayload, "uuid")
-        payload["uuid"] = inputPayload["uuid"]
-    end
-
-    # Role-based access control
-    if haskey(inputPayload, "roles")
-        payload["roles"] = inputPayload["roles"]
-    end
-
-    if haskey(inputPayload, "permissions")
-        payload["permissions"] = inputPayload["permissions"]
+    for key in ("email", "uuid", "roles", "permissions")
+        if haskey(inputPayload, key)
+            payload[key] = inputPayload[key]
+        end
     end
 
     payload_encoded = base64url_encode(JSON3.write(payload))
-    signature = __NEBULA__Sign(header_encoded, payload_encoded, ENV["NEBULAAUTH_SECRET"], algorithm)
-    return "$header_encoded.$payload_encoded.$signature"
+    signature = __ORION__Sign(headerEncoded, payload_encoded, ENV["OrionAuth_SECRET"], algorithm)
+    return "$headerEncoded.$payload_encoded.$signature"
 end
 
-function __NEBULA__DecodeJWT(token::AbstractString, secret::AbstractString = ENV["NEBULAAUTH_SECRET"])
+function __ORION__DecodeJWT(token::AbstractString, secret::AbstractString = ENV["OrionAuth_SECRET"])
     parts = split(token, ".")
     if length(parts) != 3
         error("Invalid JWT format")
     end
-    header_encoded, payload_encoded, signature = parts
-    header = JSON3.read(base64url_decode_string(header_encoded))
-    payload = JSON3.read(base64url_decode_string(payload_encoded))
-    verified = __NEBULA__Verify(header_encoded, payload_encoded, signature, ENV["NEBULAAUTH_SECRET"], header["alg"])
+    
+    headerEncoded, payloadEncoded, signature = parts
+    header = JSON3.read(base64url_decode2string(headerEncoded))
+    payload = JSON3.read(base64url_decode2string(payloadEncoded))
+
+    if header["alg"] != ENV["OrionAuth_ALGORITHM"]
+        error("Invalid JWT algorithm")
+    end
+
+    verified = __ORION__Verify(headerEncoded, payloadEncoded, signature, ENV["OrionAuth_SECRET"], header["alg"])
+
+    if !haskey(payload, "exp")
+        error("JWT does not contain expiration time")
+    end
+
+    if payload["exp"] < time()
+        error("JWT has expired")
+    end
+
     if !verified
         error("Invalid JWT signature")
     end
@@ -52,20 +57,37 @@ function __NEBULA__DecodeJWT(token::AbstractString, secret::AbstractString = ENV
 end
 
 
-function __NEBULA__Sign(header_encoded::AbstractString, payload_encoded::AbstractString, secret::AbstractString, algorithm::AbstractString)
-    # Implement signing logic based on the algorithm
+function __ORION__Sign(
+    headerEncoded::AbstractString,
+    payloadEncoded::AbstractString,
+    secret::AbstractString,
+    algorithm::AbstractString
+)::AbstractString
     if algorithm == "HS256"
-        return base64url_encode(hexdigest("sha256", secret, "$header_encoded.$payload_encoded"))
+        h = HMACState("sha256", secret)
+        Nettle.update!(h, "$headerEncoded.$payloadEncoded")
+        
+        return base64url_encode(Nettle.digest!(h)) # digest! returns a vector of UInt8
+    elseif algorithm == "HS512"
+        h = HMACState("sha512", secret)
+        Nettle.update!(h, "$headerEncoded.$payloadEncoded")
+
+        return base64url_encode(Nettle.digest!(h)) # digest! returns a vector of UInt8
     else
         error("Unsupported algorithm: $algorithm")
     end
 end
 
-function __NEBULA__Verify(header_encoded::AbstractString, payload_encoded::AbstractString, signature::AbstractString, secret::AbstractString, algorithm::AbstractString)
-    # Implement verification logic based on the algorithm
-    if algorithm == "HS256"
-        expected_signature = __NEBULA__Sign(header_encoded, payload_encoded, secret, algorithm)
-        return expected_signature == signature
+function __ORION__Verify(
+    headerEncoded::AbstractString,
+    payloadEncoded::AbstractString,
+    signature::AbstractString,
+    secret::AbstractString,
+    algorithm::AbstractString
+)::Bool
+    if algorithm in ["HS256", "HS512"]
+        expectedSignature = __ORION__Sign(headerEncoded, payloadEncoded, secret, algorithm)
+        return expectedSignature == signature
     else
         error("Unsupported algorithm: $algorithm")
     end
