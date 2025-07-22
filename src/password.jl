@@ -2,7 +2,7 @@ using Random
 using SHA
 
 # Utils for password validation and hashing
-function __NEBULA__HashPassword(password::String)
+function __ORION__HashPassword(password::String)
     generateSalt = Random.randstring(RandomDevice(), 32)
     nIterations = rand(parse(Int, ENV["OrionAuth_MIN_PASSWORD_ITTERATIONS"]):(parse(Int, ENV["OrionAuth_MIN_PASSWORD_ITTERATIONS"])*2))
 
@@ -13,7 +13,7 @@ function __NEBULA__HashPassword(password::String)
     return "sha512&$(hashed)&$(generateSalt)&$(nIterations)"
 end
 
-function __NEBULA__VerifyPassword(password::String, hashed::String)
+function __ORION__VerifyPassword(password::String, hashed::String)
     parts = split(hashed, "&")
     if length(parts) != 4
         return false

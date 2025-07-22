@@ -1,7 +1,7 @@
 # Changelog
 
 ## [0.9.0] - Pre-release version
-- Ensure NEBULAAUTH_ALGORITHM environment variable is validated and matches supported HMAC algorithms in code.
+- Ensure ORIONAUTH_ALGORITHM environment variable is validated and matches supported HMAC algorithms in code.
 - Implemented support for HMAC512
 - Implemented algorithm check between .env and JWT alg
 - Fixed compatibility following RFC

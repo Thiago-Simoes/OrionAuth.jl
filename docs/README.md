@@ -38,7 +38,7 @@ DB_PASSWORD=pass
 DB_NAME=dbname
 DB_PORT=3306
 
-NebulaORM_LOG_LEVEL=error
+OrionORM_LOG_LEVEL=error
 OrionAuth_SECRET=your_secret_key_here
 OrionAuth_ALGORITHM=HS512
 OrionAuth_EXPIRATION=3600

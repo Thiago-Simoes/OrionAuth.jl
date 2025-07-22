@@ -4,7 +4,7 @@
 # Package Features
 - Authentication using stateless token;
 - Authorization with RBAC;
-- Integration with NebulaORM.jl;
+- Integration with OrionORM.jl;
 
 ### Index
 

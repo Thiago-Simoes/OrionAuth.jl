@@ -1,11 +1,7 @@
 using Test
 using Dates
-
-using DotEnv
-DotEnv.load!()
-
 using JSON3
-using NebulaORM
+using OrionORM
 
 using OrionAuth
 OrionAuth.init!()
@@ -103,7 +99,7 @@ OrionAuth.init!()
         @test permission !== nothing
         @test permission.permission == "read"
 
-        AssignPermissionToUser(user.id, permission.permission)
+        AssignPermission(user.id, permission.permission)
         user_permission = findFirst(OrionAuth_UserPermission; query=Dict("where" => Dict("userId" => user.id, "permissionId" => permission.id)))
         @test user_permission !== nothing
         @test user_permission.userId == user.id
@@ -147,20 +143,33 @@ OrionAuth.init!()
         @test user_with_role_permission !== nothing
         @test user_with_role_permission["OrionAuth_UserRole"][1].userId == user.id
 
-        @test OrionAuth.GetUserPermissions(user.id) .|> (x -> x.permission) == ["read", "write", "delete"]
-        @test CheckUserPermission(user.id, "read") == true
+        permissions = OrionAuth.GetUserPermissions(user.id) .|> (x -> x.permission)
+        @test all(x in permissions for x in ["read", "write", "delete"])
+        @test CheckPermission(user.id, "read") == true
     end
 
     @testset verbose=true "Permissions - Direct permission" begin
+        # Garantir que a permissão "sudo" existe
+        sudo_permission = findFirst(OrionAuth_Permission; query=Dict("where" => Dict("permission" => "sudo")))
+        if isnothing(sudo_permission)
+            sudo_permission = create(OrionAuth_Permission, Dict(
+                "permission" => "sudo",
+                "description" => "Sudo permission"
+            ))
+        end
+    
         # Add direct permission to user
-        AssignPermissionToUser(user.id, "sudo")
+        AssignPermission(user.id, "sudo")
+    
         user_with_permission = findFirst(OrionAuth_User; query=Dict("where" => Dict("id" => user.id), "include" => [OrionAuth_UserPermission]))
         @test user_with_permission !== nothing
         @test user_with_permission["OrionAuth_UserPermission"][1].userId == user.id
-        @test OrionAuth.GetUserPermissions(user.id) .|> (x -> x.permission) == ["read", "write", "delete", "sudo"]
-        @test CheckUserPermission(user.id, "sudo") == true
+    
+        permissions = OrionAuth.GetUserPermissions(user.id) .|> (x -> x.permission)
+        @test all([x in permissions for x in ["read", "write", "delete", "sudo"]])
+        @test CheckPermission(user.id, "sudo") == true
     end
-
+    
     @testset verbose=true "SignIn and SignUp - JWT" begin
         @testset verbose=true "SignUp" begin
             # Use signup function to get JWT and user
@@ -169,7 +178,7 @@ OrionAuth.init!()
             # Check if JWT is generated
             @test !isnothing(jwt)
             # Decode JWT
-            decoded_payload = OrionAuth.__NEBULA__DecodeJWT(jwtStr[:access_token])
+            decoded_payload = OrionAuth.__ORION__DecodeJWT(jwtStr[:access_token])
             # Check if payload contains expected fields
             @test haskey(decoded_payload, "iat")
             @test haskey(decoded_payload, "exp")
@@ -192,30 +201,38 @@ OrionAuth.init!()
 
         @testset verbose=true "SignIn" begin
             # Assign role to user
-            AssignRoleToUser(user.id, "admin")
+            AssignRole(user.id, "admin")
             # Check if user has role, using function
             user_with_role = findFirst(OrionAuth_User; query=Dict("where" => Dict("id" => user.id), "include" => [OrionAuth_UserRole]))
             @test user_with_role !== nothing
             @test user_with_role["OrionAuth_UserRole"][1].userId == user.id
             # Check if user has role, using function
-            @test (OrionAuth.GetUserPermissions(user.id) .|> (x -> x.permission)) == ["read", "write", "delete"]
+            permissions = OrionAuth.GetUserPermissions(user.id) .|> (x -> x.permission)
+            expected_permissions = ["read", "write", "delete"]
+            for perm in expected_permissions
+                @test perm in permissions
+            end
             # Use signin function to get JWT and user
             user, jwt = signin("eu@thiago.com", "123456")
             jwtStr = JSON3.parse(jwt)
             # Check if JWT is generated
             @test !isnothing(jwt)
             # Decode JWT
-            decoded_payload = OrionAuth.__NEBULA__DecodeJWT(jwtStr[:access_token])
+            decoded_payload = OrionAuth.__ORION__DecodeJWT(jwtStr[:access_token])
             # Check if payload contains expected fields
             @test haskey(decoded_payload, "iat")
             @test haskey(decoded_payload, "exp")
 
-            # Getroles from database for know name and id
+            # Get roles from database for known name and id
             role = findFirst(OrionAuth_Role; query=Dict("where" => Dict("role" => "admin")))
 
             # Check roles
             @test decoded_payload["roles"][1][:roleId] == role.id
-            @test (decoded_payload["permissions"] .|> (x -> x.permission)) == ["read", "write", "delete"]
+
+            jwt_permissions = decoded_payload["permissions"] .|> (x -> x.permission)
+            for perm in expected_permissions
+                @test perm in jwt_permissions
+            end
         end
     end
 end

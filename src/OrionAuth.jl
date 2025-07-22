@@ -6,7 +6,7 @@ using Dates
 using DotEnv
 using HTTP
 using JSON3
-using NebulaORM
+using OrionORM
 using Nettle
 using Random
 using SHA
@@ -15,11 +15,13 @@ using UUIDs
 # Initialize .env
 DotEnv.load!()
 
-function init!()
-    dir = @__DIR__
-    
-    include(joinpath(dir, "bin/base64.jl"))
 
+function init!()
+    DotEnv.load!()
+
+    dir = @__DIR__
+    include(joinpath(dir, "bin/base64.jl"))
+    
     include(joinpath(dir, "password.jl"))
     include(joinpath(dir, "roles.jl"))
     include(joinpath(dir, "auth.jl"))
@@ -42,7 +44,7 @@ function init!()
                 ("id",         INTEGER(), [PrimaryKey(), AutoIncrement()]),
                 ("email",      TEXT(),    []),
                 ("name",       TEXT(),    []),
-                ("uuid",       NebulaORM.UUID(),    []),
+                ("uuid",       OrionORM.UUID(),    []),
                 ("password",   TEXT(),    []),
                 ("created_at", TIMESTAMP(),    [Default("CURRENT_TIMESTAMP()")]),
                 ("updated_at", TIMESTAMP(),    [Default("CURRENT_TIMESTAMP()")])
@@ -136,6 +138,6 @@ function init!()
     nothing
 end
 
-export OrionAuth_User, signin, signup, syncRolesPermissions, AssignRoleToUser, AssignPermissionToUser, SyncRolesAndPermissions, GetUserPermissions, GetUserRoles, CheckUserPermission, RemoveRole
+export OrionAuth_User, signin, signup, syncRolesPermissions, AssignRole, AssignPermission, SyncRolesAndPermissions, GetUserPermissions, GetUserRoles, CheckPermission, RemoveRole
 
 end # module OrionAuth

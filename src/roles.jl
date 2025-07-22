@@ -30,7 +30,7 @@ function AssignRole(user_id::Int, role::String)
     ))
 
     # Log the action
-    log_action("assign_role: Assigned role \"$(role.role)\" (Role ID: $(role.id)) to user ID $(user.id) at $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))", user)
+    LogAction("assign_role: Assigned role \"$(role.role)\" (Role ID: $(role.id)) to user ID $(user.id) at $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))", user)
     return new_user_role    
 end
 
@@ -57,7 +57,7 @@ function RemoveRole(user_id::Int, role::String)
     delete(existing)
 
     # Log the action
-    log_action("remove_role: Removed role \"$(role.role)\" (Role ID: $(role.id)) from user ID $(user.id) at $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))", user)
+    LogAction("remove_role: Removed role \"$(role.role)\" (Role ID: $(role.id)) from user ID $(user.id) at $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))", user)
     return true
 end
 
@@ -76,7 +76,7 @@ function GetUserRoles(user_id::Int)
     
     # Log the action
     userId = user["OrionAuth_User"].id
-    log_action("get_user_roles: Retrieved roles for user ID $(userId) at $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))", user["OrionAuth_User"].id)
+    LogAction("get_user_roles: Retrieved roles for user ID $(userId) at $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))", user["OrionAuth_User"])
     return roles
 end
 
@@ -112,7 +112,7 @@ function AssignPermission(user_id::Int, permission::String)
 
     # Log the action
     userId = user["OrionAuth_User"].id
-    log_action("assign_permission: Assigned permission \"$(permission.permission)\" (Permission ID: $(permission.id)) to user ID $(userId) at $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))", user["OrionAuth_User"])
+    LogAction("assign_permission: Assigned permission \"$(permission.permission)\" (Permission ID: $(permission.id)) to user ID $(userId) at $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))", user["OrionAuth_User"])
     return new_user_permission    
 end
 
@@ -142,7 +142,7 @@ function RemovePermission(user_id::Int, permission::String)
 
     # Log the action
     userId = user["OrionAuth_User"].id
-    log_action("remove_permission: Removed permission \"$(permission.permission)\" (Permission ID: $(permission.id)) from user ID $(userId) at $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))", user["OrionAuth_User"])
+    LogAction("remove_permission: Removed permission \"$(permission.permission)\" (Permission ID: $(permission.id)) from user ID $(userId) at $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))", user["OrionAuth_User"])
     return true
 end
 
@@ -166,7 +166,6 @@ function GetUserPermissions(user_id::Int)
     # Remove duplicates
     permissions = unique(permissions)
 
-    # Get permissions directly assigned to role permissions
 
     permissionsList = []
     for perm in permissions
@@ -176,9 +175,20 @@ function GetUserPermissions(user_id::Int)
         end
     end
 
+    # Get permissions directly assigned to role permissions
+    user_permissions = findMany(OrionAuth_UserPermission; query=Dict("where" => Dict("userId" => user_id)))
+    if !isnothing(user_permissions) 
+        for user_perm in user_permissions
+            permission = findFirst(OrionAuth_Permission; query=Dict("where" => Dict("id" => user_perm.permissionId)))
+            if permission !== nothing && !(permission in permissionsList)
+                permissionsList = vcat(permissionsList, permission)
+            end
+        end
+    end
+
 
     # Log the action
-    log_action("get_user_permissions: Retrieved permissions for user ID $(user_id) at $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))", user["OrionAuth_User"].id)
+    LogAction("get_user_permissions: Retrieved permissions for user ID $(user_id) at $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))", user["OrionAuth_User"])
     return permissionsList
 end
 
@@ -206,7 +216,7 @@ end
 
 
 """
-    SyncRolesAndPermissions(roles::Dict{String, Vector{String}})
+    syncRolesAndPermissions(roles::Dict{String, Vector{String}})
 
 Sync roles and permissions from a Dict, creating any missing roles, permissions, and relations.
 

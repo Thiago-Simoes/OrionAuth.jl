@@ -1,6 +1,6 @@
 # Defining Relationships
 
-OrionAuth leverages NebulaORM to create relationships between models. This manual explains how to create related models and query them.
+OrionAuth leverages OrionORM to create relationships between models. This manual explains how to create related models and query them.
 
 ## Creating Related Models
 You can define relationships by specifying association attributes when creating a model. For example, defining a `Profile` linked to a user:

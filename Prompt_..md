@@ -21,7 +21,7 @@
     git clone https://github.com/Thiago-Simoes/OrionAuth.jl.git
     ```
  2. Change to the project directory:
-    ```bashGenerateJWTGenerateJWTGenerateJWT
+    ```bash
     cd OrionAuth.jl
     ```
  3. Activate and instantiate packages in Julia:
@@ -41,7 +41,7 @@
  DB_NAME=dbname
  DB_PORT=3306
  
- NebulaORM_LOG_LEVEL=error
+ OrionORM_LOG_LEVEL=error
  OrionAuth_SECRET=your_secret_key_here
  OrionAuth_ALGORITHM=HS512
  OrionAuth_EXPIRATION=3600
@@ -169,7 +169,7 @@
  using DotEnv
  using HTTP
  using JSON3
- using NebulaORM
+ using OrionORM
  using Nettle
  using Random
  using SHA
@@ -205,7 +205,7 @@
                  ("id",         INTEGER(), [PrimaryKey(), AutoIncrement()]),
                  ("email",      TEXT(),    []),
                  ("name",       TEXT(),    []),
-                 ("uuid",       NebulaORM.UUID(),    []),
+                 ("uuid",       OrionORM.UUID(),    []),
                  ("password",   TEXT(),    []),
                  ("created_at", TIMESTAMP(),    [Default("CURRENT_TIMESTAMP()")]),
                  ("updated_at", TIMESTAMP(),    [Default("CURRENT_TIMESTAMP()")])
@@ -299,7 +299,7 @@
      nothing
  end
  
- export OrionAuth_User, signin, signup, syncRolesPermissions, AssignRoleToUser, AssignPermissionToUser, SyncRolesAndPermissions, GetUserPermissions, GetUserRoles, CheckUserPermission, RemoveRole
+ export OrionAuth_User, signin, signup, syncRolesPermissions, AssignRole, AssignPermissionToUser, SyncRolesAndPermissions, GetUserPermissions, GetUserRoles, CheckPermission, RemoveRole
  
  end # module OrionAuth
  ...
@@ -309,7 +309,7 @@
       🔹 Conteúdo inicial:
         ```
         
- function log_action(action::String, userId::Int)
+ function LogAction(action::String, userId::Int)
      ts = string(Dates.now())
      return create(OrionAuth_Log, Dict("userId"=>userId, "action"=>action, "timestamp"=>ts))
  end
@@ -320,7 +320,7 @@
          error("User already exists")
      end
      uuid = string(UUIDs.uuid4())
-     hashed_password = __NEBULA__HashPassword(password)
+     hashed_password = __ORION__HashPassword(password)
      ts = string(Dates.now())
      local newUser = create(OrionAuth_User, Dict(
          "email"      => email,
@@ -328,9 +328,9 @@
          "uuid"       => uuid,
          "password"   => hashed_password
      ))
-     @async log_action("signup", newUser.id)
+     @async LogAction("signup", newUser.id)
  
-     payload = generateJWT(newUser)
+     payload = GenerateJWT(newUser)
  
      returnData = Dict(
          "access_token" => payload,
@@ -347,12 +347,12 @@
          error("User not found")
      end
      
-     if !__NEBULA__VerifyPassword(password, user.password)
+     if !__ORION__VerifyPassword(password, user.password)
          error("Invalid password")
      end
-     @async log_action("signin", user.id)
+     @async LogAction("signin", user.id)
  
-     payload = generateJWT(user)
+     payload = GenerateJWT(user)
  
      returnData = Dict(
          "access_token" => payload,
@@ -363,9 +363,9 @@
      return user, returnData
  end
  
- function generateJWT(user)
+ function GenerateJWT(user)
      payload = Dict("sub" => user.id, "name" => user.name, "email" => user.email, "uuid" => user.uuid, "roles" => GetUserRoles(user.id), "permissions" => GetUserPermissions(user.id))
-     token = __NEBULA__EncodeJWT(payload, ENV["OrionAuth_SECRET"], ENV["OrionAuth_ALGORITHM"])
+     token = __ORION__EncodeJWT(payload, ENV["OrionAuth_SECRET"], ENV["OrionAuth_ALGORITHM"])
      return token
  end
  ...
@@ -384,7 +384,7 @@
  using Base64
  using Nettle
  
- function __NEBULA__EncodeJWT(inputPayload::Dict, secret::AbstractString, algorithm::AbstractString="HS256")
+ function __ORION__EncodeJWT(inputPayload::Dict, secret::AbstractString, algorithm::AbstractString="HS256")
      header = Dict("alg" => algorithm, "typ" => "JWT")
      headerEncoded = base64encode(JSON3.write(header))
  
@@ -399,11 +399,11 @@
      end
  
      payload_encoded = base64url_encode(JSON3.write(payload))
-     signature = __NEBULA__Sign(headerEncoded, payload_encoded, ENV["OrionAuth_SECRET"], algorithm)
+     signature = __ORION__Sign(headerEncoded, payload_encoded, ENV["OrionAuth_SECRET"], algorithm)
      return "$headerEncoded.$payload_encoded.$signature"
  end
  
- function __NEBULA__DecodeJWT(token::AbstractString, secret::AbstractString = ENV["OrionAuth_SECRET"])
+ function __ORION__DecodeJWT(token::AbstractString, secret::AbstractString = ENV["OrionAuth_SECRET"])
      parts = split(token, ".")
      if length(parts) != 3
          error("Invalid JWT format")
@@ -417,7 +417,7 @@
          error("Invalid JWT algorithm")
      end
  
-     verified = __NEBULA__Verify(headerEncoded, payloadEncoded, signature, ENV["OrionAuth_SECRET"], header["alg"])
+     verified = __ORION__Verify(headerEncoded, payloadEncoded, signature, ENV["OrionAuth_SECRET"], header["alg"])
  
      if !haskey(payload, "exp")
          error("JWT does not contain expiration time")
@@ -434,7 +434,7 @@
  end
  
  
- function __NEBULA__Sign(
+ function __ORION__Sign(
      headerEncoded::AbstractString,
      payloadEncoded::AbstractString,
      secret::AbstractString,
@@ -455,7 +455,7 @@
      end
  end
  
- function __NEBULA__Verify(
+ function __ORION__Verify(
      headerEncoded::AbstractString,
      payloadEncoded::AbstractString,
      signature::AbstractString,
@@ -463,7 +463,7 @@
      algorithm::AbstractString
  )::Bool
      if algorithm in ["HS256", "HS512"]
-         expectedSignature = __NEBULA__Sign(headerEncoded, payloadEncoded, secret, algorithm)
+         expectedSignature = __ORION__Sign(headerEncoded, payloadEncoded, secret, algorithm)
          return expectedSignature == signature
      else
          error("Unsupported algorithm: $algorithm")
@@ -479,7 +479,7 @@
  using SHA
  
  # Utils for password validation and hashing
- function __NEBULA__HashPassword(password::String)
+ function __ORION__HashPassword(password::String)
      generateSalt = Random.randstring(RandomDevice(), 32)
      nIterations = rand(parse(Int, ENV["OrionAuth_MIN_PASSWORD_ITTERATIONS"]):(parse(Int, ENV["OrionAuth_MIN_PASSWORD_ITTERATIONS"])*2))
  
@@ -490,7 +490,7 @@
      return "sha512&$(hashed)&$(generateSalt)&$(nIterations)"
  end
  
- function __NEBULA__VerifyPassword(password::String, hashed::String)
+ function __ORION__VerifyPassword(password::String, hashed::String)
      parts = split(hashed, "&")
      if length(parts) != 4
          return false
@@ -549,7 +549,7 @@
      ))
  
      # Log the action
-     log_action("assign_role: Assigned role \"$(role.role)\" (Role ID: $(role.id)) to user ID $(user.id) at $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))", user)
+     LogAction("assign_role: Assigned role \"$(role.role)\" (Role ID: $(role.id)) to user ID $(user.id) at $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))", user.id)
      return new_user_role    
  end
  
@@ -576,11 +576,11 @@
      delete(existing)
  
      # Log the action
-     log_action("remove_role: Removed role \"$(role.role)\" (Role ID: $(role.id)) from user ID $(user.id) at $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))", user)
+     LogAction("remove_role: Removed role \"$(role.role)\" (Role ID: $(role.id)) from user ID $(user.id) at $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))", user)
      return true
  end
  
- function getUserRoles(user_id::Int)
+ function GetUserRoles(user_id::Int)
      # Check if user exists
      user = findFirst(OrionAuth_User; query=Dict("where" => Dict("id" => user_id), "include" => [OrionAuth_UserRole]))
      if user === nothing
@@ -595,7 +595,7 @@
      
      # Log the action
      userId = user["OrionAuth_User"].id
-     log_action("get_user_roles: Retrieved roles for user ID $(userId) at $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))", user["OrionAuth_User"])
+     LogAction("get_user_roles: Retrieved roles for user ID $(userId) at $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))", user["OrionAuth_User"].id)
      return roles
  end
  
@@ -631,7 +631,7 @@
  
      # Log the action
      userId = user["OrionAuth_User"].id
-     log_action("assign_permission: Assigned permission \"$(permission.permission)\" (Permission ID: $(permission.id)) to user ID $(userId) at $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))", user["OrionAuth_User"])
+     LogAction("assign_permission: Assigned permission \"$(permission.permission)\" (Permission ID: $(permission.id)) to user ID $(userId) at $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))", user["OrionAuth_User"])
      return new_user_permission    
  end
  
@@ -661,11 +661,11 @@
  
      # Log the action
      userId = user["OrionAuth_User"].id
-     log_action("remove_permission: Removed permission \"$(permission.permission)\" (Permission ID: $(permission.id)) from user ID $(userId) at $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))", user["OrionAuth_User"])
+     LogAction("remove_permission: Removed permission \"$(permission.permission)\" (Permission ID: $(permission.id)) from user ID $(userId) at $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))", user["OrionAuth_User"])
      return true
  end
  
- function getUserPermissions(user_id::Int)
+ function GetUserPermissions(user_id::Int)
      # Check if user exists
      user = findFirst(OrionAuth_User; query=Dict("where" => Dict("id" => user_id), "include" => [OrionAuth_UserRole]))
      if user === nothing
@@ -697,7 +697,7 @@
  
  
      # Log the action
-     log_action("get_user_permissions: Retrieved permissions for user ID $(user_id) at $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))", user["OrionAuth_User"])
+     LogAction("get_user_permissions: Retrieved permissions for user ID $(user_id) at $(Dates.format(Dates.now(), "yyyy-mm-dd HH:MM:SS"))", user["OrionAuth_User"].id)
      return permissionsList
  end
  
@@ -709,7 +709,7 @@
      end
  
      # Check if permission exists
-     permissions = getUserPermissions(user.id)
+     permissions = GetUserPermissions(user.id)
      if isempty(permissions)
          error("Permission not found")
      end
@@ -783,7 +783,7 @@
  DotEnv.load!()
  
  using JSON3
- using NebulaORM
+ using OrionORM
  
  using OrionAuth
  OrionAuth.init!()
@@ -857,7 +857,7 @@
          @test role !== nothing
          @test role.role == "admin"
  
-         AssignRoleToUser(user.id, role.role)
+         AssignRole(user.id, role.role)
          user_role = findFirst(OrionAuth_UserRole; query=Dict("where" => Dict("userId" => user.id, "roleId" => role.id)))
          @test user_role !== nothing
          @test user_role.userId == user.id
@@ -881,7 +881,7 @@
          @test permission !== nothing
          @test permission.permission == "read"
  
-         AssignPermissionToUser(user.id, permission.permission)
+         AssignPermission(user.id, permission.permission)
          user_permission = findFirst(OrionAuth_UserPermission; query=Dict("where" => Dict("userId" => user.id, "permissionId" => permission.id)))
          @test user_permission !== nothing
          @test user_permission.userId == user.id
@@ -926,17 +926,17 @@
          @test user_with_role_permission["OrionAuth_UserRole"][1].userId == user.id
  
          @test OrionAuth.GetUserPermissions(user.id) .|> (x -> x.permission) == ["read", "write", "delete"]
-         @test CheckUserPermission(user.id, "read") == true
+         @test CheckPermission(user.id, "read") == true
      end
  
      @testset verbose=true "Permissions - Direct permission" begin
          # Add direct permission to user
-         AssignPermissionToUser(user.id, "sudo")
+         AssignPermission(user.id, "sudo")
          user_with_permission = findFirst(OrionAuth_User; query=Dict("where" => Dict("id" => user.id), "include" => [OrionAuth_UserPermission]))
          @test user_with_permission !== nothing
          @test user_with_permission["OrionAuth_UserPermission"][1].userId == user.id
          @test OrionAuth.GetUserPermissions(user.id) .|> (x -> x.permission) == ["read", "write", "delete", "sudo"]
-         @test CheckUserPermission(user.id, "sudo") == true
+         @test CheckPermission(user.id, "sudo") == true
      end
  
      @testset verbose=true "SignIn and SignUp - JWT" begin
@@ -947,7 +947,7 @@
              # Check if JWT is generated
              @test !isnothing(jwt)
              # Decode JWT
-             decoded_payload = OrionAuth.__NEBULA__DecodeJWT(jwtStr[:access_token])
+             decoded_payload = OrionAuth.__ORION__DecodeJWT(jwtStr[:access_token])
              # Check if payload contains expected fields
              @test haskey(decoded_payload, "iat")
              @test haskey(decoded_payload, "exp")
@@ -970,7 +970,7 @@
  
          @testset verbose=true "SignIn" begin
              # Assign role to user
-             AssignRoleToUser(user.id, "admin")
+             AssignRole(user.id, "admin")
              # Check if user has role, using function
              user_with_role = findFirst(OrionAuth_User; query=Dict("where" => Dict("id" => user.id), "include" => [OrionAuth_UserRole]))
              @test user_with_role !== nothing
@@ -983,7 +983,7 @@
              # Check if JWT is generated
              @test !isnothing(jwt)
              # Decode JWT
-             decoded_payload = OrionAuth.__NEBULA__DecodeJWT(jwtStr[:access_token])
+             decoded_payload = OrionAuth.__ORION__DecodeJWT(jwtStr[:access_token])
              # Check if payload contains expected fields
              @test haskey(decoded_payload, "iat")
              @test haskey(decoded_payload, "exp")

@@ -52,7 +52,7 @@ OrionAuth prioritizes strong password protection.
 * **Salting:** A cryptographically strong, unique 32-byte random salt (generated using `Random.randstring(RandomDevice(), 32)`) is created for each password.
 * **Iterations:** The SHA512 hashing process is iterated multiple times to increase computational cost for attackers. The minimum number of iterations is configurable via `ENV["OrionAuth_MIN_PASSWORD_ITTERATIONS"]` (defaults to 25000, actual iterations randomized between min and 2*min).
 * **Storage Format:** Passwords are stored in the database in the format: `"sha512&<hashed_password_hex>&<salt_string>&<iterations_count>"`.
-* **Constant-Time Comparison (Recommendation):** For maximum protection against timing attacks during password verification, it is best practice to use a constant-time string/byte comparison function. While OrionAuth's current password verification (`__NEBULA__VerifyPassword`) uses standard string comparison, applications with very high-security requirements should consider if further measures are needed at the application or library level.
+* **Constant-Time Comparison (Recommendation):** For maximum protection against timing attacks during password verification, it is best practice to use a constant-time string/byte comparison function. While OrionAuth's current password verification (`__ORION__VerifyPassword`) uses standard string comparison, applications with very high-security requirements should consider if further measures are needed at the application or library level.
 * **Future Enhancements:** Support for more modern key derivation functions like Argon2id or bcrypt is listed in "Upcoming Features" in the README.
 
 ### 2.3 Secrets Management (Application/Infrastructure Responsibility)
@@ -92,7 +92,7 @@ OrionAuth includes basic audit logging capabilities.
 OrionAuth provides a Role-Based Access Control (RBAC) system.
 
 * **Models:** Defines `OrionAuth_Role`, `OrionAuth_Permission`, `OrionAuth_UserRole`, `OrionAuth_RolePermission`, and `OrionAuth_UserPermission` tables to manage fine-grained access.
-* **Functionality:** Provides functions to assign roles to users (`AssignRoleToUser`), assign permissions to roles (via `SyncRolesAndPermissions` or direct table manipulation), assign direct permissions to users (`AssignPermissionToUser`), and check user permissions (`CheckUserPermission`, `GetUserPermissions`).
+* **Functionality:** Provides functions to assign roles to users (`AssignRoleToUser`), assign permissions to roles (via `SyncRolesAndPermissions` or direct table manipulation), assign direct permissions to users (`AssignPermissionToUser`), and check user permissions (`CheckPermission`, `GetUserPermissions`).
 * **Database Hardening (Recommendation):** Complement OrionAuth's RBAC by configuring restrictive database grants for your application's database user, minimizing privileges on critical tables (e.g., restricting `DROP`/`DELETE` on core auth tables).
 
 ### 2.8 Rate Limiting and Brute-Force Protection (Planned / Application or Infrastructure Responsibility for V1)
