@@ -141,6 +141,6 @@ function init!()
     nothing
 end
 
-export @Auth, signin, signup, syncRolesPermissions, assignRole, assignPermission, syncRolesAndPermissions, getUserPermissions, getUserRoles, checkPermission, removeRole, __ORION__DecodeJWT, Unauthorized
+export Auth, signin, signup, syncRolesPermissions, assignRole, assignPermission, syncRolesAndPermissions, getUserPermissions, getUserRoles, checkPermission, removeRole, __ORION__DecodeJWT, Unauthorized
 
 end # module OrionAuth
