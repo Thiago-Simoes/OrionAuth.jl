@@ -58,44 +58,44 @@ end
 
 
 """
-This macro checks if User is authenticated and has the required permissions.
+This function checks if User is authenticated and has the required permissions.
 Get request using function `request() :: HTTP.Request`
 """
-macro Auth()
-    return quote
-        headers = request().headers |> Dict
-        # Find user by Authorization header (case insensitive)
-        auth_key = nothing
-        for k in keys(headers)
-            if lowercase(k) == "authorization"
-            auth_key = k
-            break
-            end
-        end
-        if isnothing(auth_key)
-            error("Authorization header is missing")
-        end  
-
-        auth_header = headers[auth_key]
-
-        # Get JWT token from the header
-        # Split using space
-        parts = split(auth_header, " ")
-        if length(parts) != 2 || parts[1] != "Bearer"
-            error("Invalid Authorization header format")
-        end
-
-        token = parts[2]
-
-        # Decode JWT token
-        payload = nothing
-        try
-            payload = __ORION__DecodeJWT(token, ENV["OrionAuth_SECRET"]) # Auto verify signature
-        catch e
-            # Return 401 Unauthorized if JWT is invalid
-            return Unauthorized()
+function Auth()
+    headers = Genie.Requests.request().headers |> Dict
+    # Find user by Authorization header (case insensitive)
+    auth_key = nothing
+    for k in keys(headers)
+        if lowercase(k) == "authorization"
+        auth_key = k
+        break
         end
     end
+    if isnothing(auth_key)
+        # Uses ExceptionalResponse - ExceptionalResponse(status, headers, body)
+        throw(ExceptionalResponse(401, [], "Authorization header is missing"))
+    end  
+
+    auth_header = headers[auth_key]
+
+    # Get JWT token from the header
+    # Split using space
+    parts = split(auth_header, " ")
+    if length(parts) != 2 || parts[1] != "Bearer"
+        throw(ExceptionalResponse(400, [], "Invalid Authorization header format"))
+    end
+
+    token = parts[2]
+
+    # Decode JWT token
+    payload = nothing
+    try
+        payload = __ORION__DecodeJWT(token, ENV["OrionAuth_SECRET"]) # Auto verify signature
+    catch e
+        # Return 401 Unauthorized if JWT is invalid
+        throw(ExceptionalResponse(401, [], "Authorization header is missing"))
+    end
+    return nothing
 end
     
 

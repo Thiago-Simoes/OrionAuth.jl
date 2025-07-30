@@ -11,6 +11,8 @@ using Nettle
 using Random
 using SHA
 using UUIDs
+using Genie
+using Genie.Requests
 
 # Initialize .env
 DotEnv.load!()
