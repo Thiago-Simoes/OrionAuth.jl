@@ -56,8 +56,51 @@ function signin(email::String, password::String)
     return user, returnData
 end
 
+
+"""
+This macro checks if User is authenticated and has the required permissions.
+Get request using function `request() :: HTTP.Request`
+"""
+macro Auth()
+    return quote
+        headers = request().headers |> Dict
+        # Find user by Authorization header (case insensitive)
+        auth_key = nothing
+        for k in keys(headers)
+            if lowercase(k) == "authorization"
+            auth_key = k
+            break
+            end
+        end
+        if isnothing(auth_key)
+            error("Authorization header is missing")
+        end  
+
+        auth_header = headers[auth_key]
+
+        # Get JWT token from the header
+        # Split using space
+        parts = split(auth_header, " ")
+        if length(parts) != 2 || parts[1] != "Bearer"
+            error("Invalid Authorization header format")
+        end
+
+        token = parts[2]
+
+        # Decode JWT token
+        payload = nothing
+        try
+            payload = __ORION__DecodeJWT(token, ENV["OrionAuth_SECRET"]) # Auto verify signature
+        catch e
+            # Return 401 Unauthorized if JWT is invalid
+            return Unauthorized()
+        end
+    end
+end
+    
+
 function GenerateJWT(user)
-    payload = Dict("sub" => user.id, "name" => user.name, "email" => user.email, "uuid" => user.uuid, "roles" => GetUserRoles(user.id), "permissions" => GetUserPermissions(user.id))
+    payload = Dict("sub" => user.id, "name" => user.name, "email" => user.email, "uuid" => user.uuid, "roles" => getUserRoles(user.id), "permissions" => getUserPermissions(user.id))
     token = __ORION__EncodeJWT(payload, ENV["OrionAuth_SECRET"], ENV["OrionAuth_ALGORITHM"])
     return token
 end

@@ -75,7 +75,7 @@ OrionAuth.init!()
         @test role !== nothing
         @test role.role == "admin"
 
-        AssignRole(user.id, role.role)
+        assignRole(user.id, role.role)
         user_role = findFirst(OrionAuth_UserRole; query=Dict("where" => Dict("userId" => user.id, "roleId" => role.id)))
         @test user_role !== nothing
         @test user_role.userId == user.id
@@ -99,7 +99,7 @@ OrionAuth.init!()
         @test permission !== nothing
         @test permission.permission == "read"
 
-        AssignPermission(user.id, permission.permission)
+        assignPermission(user.id, permission.permission)
         user_permission = findFirst(OrionAuth_UserPermission; query=Dict("where" => Dict("userId" => user.id, "permissionId" => permission.id)))
         @test user_permission !== nothing
         @test user_permission.userId == user.id
@@ -125,7 +125,7 @@ OrionAuth.init!()
 
         deleteMany(OrionAuth_UserPermission, Dict("where" => Dict("userId" => user.id)))
 
-        SyncRolesAndPermissions(Dict(
+        syncRolesAndPermissions(Dict(
             "admin" => ["read", "write", "delete"],
             "user" => ["read"],
             "god" => ["read", "write", "delete", "sudo"]
@@ -143,9 +143,9 @@ OrionAuth.init!()
         @test user_with_role_permission !== nothing
         @test user_with_role_permission["OrionAuth_UserRole"][1].userId == user.id
 
-        permissions = OrionAuth.GetUserPermissions(user.id) .|> (x -> x.permission)
+        permissions = getUserPermissions(user.id) .|> (x -> x.permission)
         @test all(x in permissions for x in ["read", "write", "delete"])
-        @test CheckPermission(user.id, "read") == true
+        @test checkPermission(user.id, "read") == true
     end
 
     @testset verbose=true "Permissions - Direct permission" begin
@@ -159,15 +159,15 @@ OrionAuth.init!()
         end
     
         # Add direct permission to user
-        AssignPermission(user.id, "sudo")
+        assignPermission(user.id, "sudo")
     
         user_with_permission = findFirst(OrionAuth_User; query=Dict("where" => Dict("id" => user.id), "include" => [OrionAuth_UserPermission]))
         @test user_with_permission !== nothing
         @test user_with_permission["OrionAuth_UserPermission"][1].userId == user.id
     
-        permissions = OrionAuth.GetUserPermissions(user.id) .|> (x -> x.permission)
+        permissions = getUserPermissions(user.id) .|> (x -> x.permission)
         @test all([x in permissions for x in ["read", "write", "delete", "sudo"]])
-        @test CheckPermission(user.id, "sudo") == true
+        @test checkPermission(user.id, "sudo") == true
     end
     
     @testset verbose=true "SignIn and SignUp - JWT" begin
@@ -201,13 +201,13 @@ OrionAuth.init!()
 
         @testset verbose=true "SignIn" begin
             # Assign role to user
-            AssignRole(user.id, "admin")
+            assignRole(user.id, "admin")
             # Check if user has role, using function
             user_with_role = findFirst(OrionAuth_User; query=Dict("where" => Dict("id" => user.id), "include" => [OrionAuth_UserRole]))
             @test user_with_role !== nothing
             @test user_with_role["OrionAuth_UserRole"][1].userId == user.id
             # Check if user has role, using function
-            permissions = OrionAuth.GetUserPermissions(user.id) .|> (x -> x.permission)
+            permissions = getUserPermissions(user.id) .|> (x -> x.permission)
             expected_permissions = ["read", "write", "delete"]
             for perm in expected_permissions
                 @test perm in permissions

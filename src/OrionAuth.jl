@@ -26,6 +26,7 @@ function init!()
     include(joinpath(dir, "roles.jl"))
     include(joinpath(dir, "auth.jl"))
     include(joinpath(dir, "jwt.jl"))
+    include(joinpath(dir, "response.jl"))
 
     @eval begin
         OrionAuth_Log = Model(
@@ -138,6 +139,6 @@ function init!()
     nothing
 end
 
-export OrionAuth_User, signin, signup, syncRolesPermissions, AssignRole, AssignPermission, SyncRolesAndPermissions, GetUserPermissions, GetUserRoles, CheckPermission, RemoveRole
+export @Auth, signin, signup, syncRolesPermissions, assignRole, assignPermission, syncRolesAndPermissions, getUserPermissions, getUserRoles, checkPermission, removeRole, __ORION__DecodeJWT, Unauthorized
 
 end # module OrionAuth
