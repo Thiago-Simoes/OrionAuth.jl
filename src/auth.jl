@@ -97,6 +97,44 @@ function Auth()
     end
     return nothing
 end
+
+
+function getUserData()
+    headers = Genie.Requests.request().headers |> Dict
+    # Find user by Authorization header (case insensitive)
+    auth_key = nothing
+    for k in keys(headers)
+        if lowercase(k) == "authorization"
+        auth_key = k
+        break
+        end
+    end
+    if isnothing(auth_key)
+        # Uses ExceptionalResponse - ExceptionalResponse(status, headers, body)
+        throw(Genie.Exceptions.ExceptionalResponse(401, [], "Authorization header is missing"))
+    end  
+
+    auth_header = headers[auth_key]
+
+    # Get JWT token from the header
+    # Split using space
+    parts = split(auth_header, " ")
+    if length(parts) != 2 || parts[1] != "Bearer"
+        throw(ExceptionalResponse(400, [], "Invalid Authorization header format"))
+    end
+
+    token = parts[2]
+
+    # Decode JWT token
+    payload = nothing
+    try
+        payload = __ORION__DecodeJWT(token, ENV["OrionAuth_SECRET"]) # Auto verify signature
+    catch e
+        # Return 401 Unauthorized if JWT is invalid
+        throw(ExceptionalResponse(401, [], "Authorization header is missing"))
+    end
+    return payload
+end
     
 
 function GenerateJWT(user)
