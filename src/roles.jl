@@ -20,7 +20,7 @@ function assignRole(user_id::Int, role::String)
     # Check if user already has the role
     existing = findFirst(OrionAuth_UserRole; query=Dict("where" => Dict("userId" => user_id, "roleId" => role.id)))
     if existing !== nothing
-        return nothing
+        error("User already has this role")
     end
 
     # Assign role to user

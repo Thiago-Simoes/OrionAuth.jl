@@ -73,7 +73,7 @@ function Auth()
     end
     if isnothing(auth_key)
         # Uses ExceptionalResponse - ExceptionalResponse(status, headers, body)
-        throw(ExceptionalResponse(401, [], "Authorization header is missing"))
+        throw(Genie.Exceptions.ExceptionalResponse(401, [], "Authorization header is missing"))
     end  
 
     auth_header = headers[auth_key]
