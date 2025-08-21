@@ -1,6 +1,9 @@
 # Changelog
 
-## [0.9.0] - Pre-release version
+## [0.5.0] - 2025-08-07
+At this point, we’re at a usable stage. OrionAuth should be used with caution;
+it provides only the bare minimum and is intended for small projects, internal systems, and testing
+
 - Ensure ORIONAUTH_ALGORITHM environment variable is validated and matches supported HMAC algorithms in code.
 - Implemented support for HMAC512
 - Implemented algorithm check between .env and JWT alg

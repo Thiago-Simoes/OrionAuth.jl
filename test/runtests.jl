@@ -1,12 +1,15 @@
 using Test
 using Dates
 using JSON3
+using HTTP
+using Genie
+using Genie.Router
 using OrionORM
 
 using OrionAuth
 OrionAuth.init!()
 
-@testset "OrionAuth" begin
+@testset verbose=true "OrionAuth" begin
     user, jwt = signup("th.simoes@proton.me", "Thiago Simões", "123456")
     userLogging, jwt = signin("th.simoes@proton.me", "123456")
     @testset verbose=true "Authentication - Login/Register" begin
@@ -235,16 +238,103 @@ OrionAuth.init!()
             end
         end
     end
+
+    #-------------------------------------------------------------------------------
+    # Setup test routes with middleware Auth() / getUserData()
+    #-------------------------------------------------------------------------------
+    function setupTestRoutes()
+        function protected()
+            Auth()                                 # throws 401/400 if not authorized
+            "protected content"
+        end
+        route("/protected", protected, method = "GET")
+
+        function userRoute()
+            data = getUserData()                   # throws 401/400 if not authorized
+            JSON3.write(data)
+        end
+        route("/user", userRoute, method = "GET")
+
+        function deleteResource()
+            Auth()
+            payload = getUserData()
+            if !checkPermission(payload["sub"], "delete")
+                throw(Genie.Exceptions.ExceptionalResponse(403, [], "Forbidden"))
+            end
+            "deleted"
+        end
+        route("/delete-resource", deleteResource, method = "DELETE")
+    end
+
+    #-------------------------------------------------------------------------------
+    # Initialize Genie in test mode and start the server
+    #-------------------------------------------------------------------------------
+    Genie.config.run_as_server = false
+    setupTestRoutes()
+    @async Genie.up()
+
+    #-------------------------------------------------------------------------------
+    # Test suite for middleware and role‐protected routes
+    #-------------------------------------------------------------------------------
+    @testset "Middleware and Protected Routes" begin
+
+        # Prepare a fresh user and extract initial JWT
+        user, signupData = signup("route@thiago.com", "Route Tester", "testPwd")
+        initialToken = JSON3.parse(signupData)["access_token"]
+
+        # 1) /protected without Authorization → should throw 401
+        @test_throws HTTP.Exceptions.StatusError HTTP.request("GET", "http://127.0.0.1:8000/protected")
+
+        # 2) /protected with bad header format → should throw 400
+        @test_throws HTTP.Exceptions.StatusError HTTP.request("GET", "http://127.0.0.1:8000/protected";
+                                                            headers = ["Authorization" => "Token $initialToken"])
+
+        # 3) /protected with valid Bearer token → 200 + correct body
+        resp = HTTP.request("GET", "http://127.0.0.1:8000/protected";
+                            headers = ["Authorization" => "Bearer $initialToken"])
+        @test resp.status == 200
+        @test String(resp.body) == "protected content"
+
+        # 4) /user without Authorization → should throw 401
+        @test_throws HTTP.Exceptions.StatusError HTTP.request("GET", "http://127.0.0.1:8000/user")
+
+        # 5) /user with valid token → 200 + correct payload
+        resp = HTTP.request("GET", "http://127.0.0.1:8000/user";
+                            headers = ["Authorization" => "Bearer $initialToken"])
+        @test resp.status == 200
+        payload = JSON3.read(String(resp.body))
+        @test payload["email"] == user.email
+        @test payload["name"]  == user.name
+        @test payload["sub"]   == user.id
+
+        # 6) DELETE /delete-resource without 'delete' permission → should throw 403
+        @test_throws HTTP.Exceptions.StatusError HTTP.request("DELETE", "http://127.0.0.1:8000/delete-resource";
+                                                            headers = ["Authorization" => "Bearer $initialToken"])
+
+        # 7) Grant admin role, then signin again to refresh JWT with new permissions
+        assignRole(user.id, "admin")
+        _, signinData = signin("route@thiago.com", "testPwd")
+        updatedToken = JSON3.parse(signinData)["access_token"]
+
+        # 8) DELETE /delete-resource with delete permission → 200 + correct body
+        resp = HTTP.request("DELETE", "http://127.0.0.1:8000/delete-resource";
+                            headers = ["Authorization" => "Bearer $updatedToken"])
+        @test resp.status == 200
+        @test String(resp.body) == "deleted"
+    end
+
 end
 
+
+
 conn = dbConnection()
-dropTable!(conn, "OrionAuth_User")
 dropTable!(conn, "OrionAuth_Log")
 dropTable!(conn, "Profile")
-dropTable!(conn, "OrionAuth_Role")
 dropTable!(conn, "OrionAuth_RolePermission")
-dropTable!(conn, "OrionAuth_Permission")
 dropTable!(conn, "OrionAuth_UserRole")
 dropTable!(conn, "OrionAuth_UserPermission")
 dropTable!(conn, "OrionAuth_EmailVerification")
 dropTable!(conn, "OrionAuth_PasswordReset")
+dropTable!(conn, "OrionAuth_Permission")
+dropTable!(conn, "OrionAuth_Role")
+dropTable!(conn, "OrionAuth_User")

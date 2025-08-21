@@ -58,12 +58,14 @@ end
 
 
 """
-This function checks if User is authenticated and has the required permissions.
-Get request using function `request() :: HTTP.Request`
+    extractBearerToken() -> String
+
+Extracts the JWT from the `Authorization: Bearer <token>` header.
+Throws 401 if header is missing, 400 if format is invalid.
 """
-function Auth()
+function extractBearerToken()
     headers = Genie.Requests.request().headers |> Dict
-    # Find user by Authorization header (case insensitive)
+
     auth_key = nothing
     for k in keys(headers)
         if lowercase(k) == "authorization"
@@ -82,20 +84,53 @@ function Auth()
     # Split using space
     parts = split(auth_header, " ")
     if length(parts) != 2 || parts[1] != "Bearer"
-        throw(ExceptionalResponse(400, [], "Invalid Authorization header format"))
+        throw(Genie.Exceptions.ExceptionalResponse(400, [], "Invalid Authorization header format"))
     end
 
     token = parts[2]
+    return token
+end
 
-    # Decode JWT token
-    payload = nothing
+"""
+    decodeJWT(token::AbstractString) -> Dict
+
+Decodes and verifies the JWT signature.
+Throws 401 if token is invalid or expired.
+"""
+function decodeJWT(token::AbstractString)
     try
-        payload = __ORION__DecodeJWT(token, ENV["OrionAuth_SECRET"]) # Auto verify signature
-    catch e
-        # Return 401 Unauthorized if JWT is invalid
-        throw(ExceptionalResponse(401, [], "Authorization header is missing"))
+        return __ORION__DecodeJWT(token, ENV["OrionAuth_SECRET"])
+    catch
+        throw(Genie.Exceptions.ExceptionalResponse(401, [], "Invalid or expired token"))
     end
-    return nothing
+end
+
+"""
+    Auth(requiredRole::Union{String, Vector{String}}="") -> Dict
+
+1. Extracts and verifies JWT.
+2. Optionally checks that the decoded payload contains the given role(s).
+3. Returns the decoded payload for further use (e.g. getUserData can just call Auth()).
+
+Throws:
+- 401 if token missing/invalid,
+- 403 if requiredRole is not present in user roles.
+"""
+function Auth(requiredPermission::Union{String, Vector{String}} = "")
+    token = extractBearerToken()
+    payload = decodeJWT(token)
+
+    # normalize roles to a Vector{String}
+    userPermissions = payload["permissions"] .|> r -> r[:permission] .|> String
+
+    if requiredPermission != ""
+        required = isa(requiredPermission, String) ? [requiredPermission] : requiredPermission
+        if !all(r-> r in userPermissions, required)
+            throw(Genie.Exceptions.ExceptionalResponse(403, [], "Forbidden: missing role(s) $(required)"))
+        end
+    end
+
+    return payload
 end
 
 
@@ -120,7 +155,7 @@ function getUserData()
     # Split using space
     parts = split(auth_header, " ")
     if length(parts) != 2 || parts[1] != "Bearer"
-        throw(ExceptionalResponse(400, [], "Invalid Authorization header format"))
+        throw(Genie.Exceptions.ExceptionalResponse(400, [], "Invalid Authorization header format"))
     end
 
     token = parts[2]
@@ -131,7 +166,7 @@ function getUserData()
         payload = __ORION__DecodeJWT(token, ENV["OrionAuth_SECRET"]) # Auto verify signature
     catch e
         # Return 401 Unauthorized if JWT is invalid
-        throw(ExceptionalResponse(401, [], "Authorization header is missing"))
+        throw(Genie.Exceptions.ExceptionalResponse(401, [], "Authorization header is missing"))
     end
     return payload
 end

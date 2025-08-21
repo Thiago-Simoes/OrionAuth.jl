@@ -46,6 +46,7 @@ function init!()
             [
                 ("id",         INTEGER(), [PrimaryKey(), AutoIncrement()]),
                 ("email",      TEXT(),    []),
+                ("email_confirmed",      OrionORM.BOOLEAN(),    [Default(true)]),
                 ("name",       TEXT(),    []),
                 ("uuid",       OrionORM.UUID(),    []),
                 ("password",   TEXT(),    []),
@@ -141,6 +142,6 @@ function init!()
     nothing
 end
 
-export Auth, signin, signup, syncRolesPermissions, assignRole, assignPermission, syncRolesAndPermissions, getUserPermissions, getUserRoles, checkPermission, removeRole, __ORION__DecodeJWT, Unauthorized
+export Auth, signin, signup, syncRolesPermissions, assignRole, assignPermission, syncRolesAndPermissions, getUserPermissions, getUserRoles, checkPermission, removeRole, __ORION__DecodeJWT, Unauthorized, getUserData
 
 end # module OrionAuth
