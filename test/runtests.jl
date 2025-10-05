@@ -9,7 +9,30 @@ using OrionORM
 using OrionAuth
 OrionAuth.init!()
 
+ENV["OrionAuth_PASSWORD_ALGORITHM"] = "argon2id"
+ENV["OrionAuth_ENFORCE_EMAIL_CONFIRMATION"] = "false"
+set_email_sender!(nothing)
+
 @testset verbose=true "OrionAuth" begin
+    @testset "Password hashing" begin
+        previous = get(ENV, "OrionAuth_PASSWORD_ALGORITHM", nothing)
+        try
+            ENV["OrionAuth_PASSWORD_ALGORITHM"] = "argon2id"
+            argon_hash = OrionAuth.__ORION__HashPassword("pa55word!")
+            @test startswith(argon_hash, "\\$argon2id$")
+            @test OrionAuth.__ORION__VerifyPassword("pa55word!", argon_hash)
+            @test !OrionAuth.__ORION__VerifyPassword("wrong", argon_hash)
+
+            ENV["OrionAuth_PASSWORD_ALGORITHM"] = "sha512"
+            sha_hash = OrionAuth.__ORION__HashPassword("legacy")
+            @test startswith(sha_hash, "sha512&")
+            @test OrionAuth.__ORION__VerifyPassword("legacy", sha_hash)
+            @test !OrionAuth.__ORION__VerifyPassword("legacy!", sha_hash)
+        finally
+            isnothing(previous) ? delete!(ENV, "OrionAuth_PASSWORD_ALGORITHM") : ENV["OrionAuth_PASSWORD_ALGORITHM"] = previous
+        end
+    end
+
     user, jwt = signup("th.simoes@proton.me", "Thiago Simões", "123456")
     userLogging, jwt = signin("th.simoes@proton.me", "123456")
     @testset verbose=true "Authentication - Login/Register" begin
@@ -235,6 +258,49 @@ OrionAuth.init!()
             jwt_permissions = decoded_payload["permissions"] .|> (x -> x.permission)
             for perm in expected_permissions
                 @test perm in jwt_permissions
+            end
+        end
+
+        @testset "Email verification enforcement" begin
+            old_enforce = get(ENV, "OrionAuth_ENFORCE_EMAIL_CONFIRMATION", nothing)
+            default_template = OrionAuth.VERIFICATION_EMAIL_TEMPLATE[]
+            sent = VerificationEmail[]
+            try
+                ENV["OrionAuth_ENFORCE_EMAIL_CONFIRMATION"] = "true"
+                set_email_sender!(email -> push!(sent, email))
+                set_verification_email_template!(EmailTemplate(
+                    subject = "Verifique {{email}}",
+                    body = "Token: {{token}}\nURL: {{verification_url}}",
+                ))
+
+                pending_user, pending_response = signup("verify@thiago.com", "Verify User", "secure123")
+                parsed = JSON3.parse(pending_response)
+                @test parsed[:status] == "verification_required"
+                @test !parsed[:email_confirmed]
+
+                record = findFirst(OrionAuth_EmailVerification; query = Dict("where" => Dict("userId" => pending_user.id)))
+                @test record !== nothing
+                first_token = record.token
+                @test !isempty(sent)
+                @test sent[1].context["token"] == first_token
+
+                @test_throws ErrorException signin("verify@thiago.com", "secure123")
+
+                new_token = resend_verification_token("verify@thiago.com")
+                @test new_token !== nothing
+                @test length(sent) >= 2
+                @test sent[end].context["token"] == new_token
+
+                verified_user = verify_email(new_token)
+                @test getproperty(verified_user, :email_confirmed)
+
+                verified_user, verified_jwt = signin("verify@thiago.com", "secure123")
+                parsed_jwt = JSON3.parse(verified_jwt)
+                @test haskey(parsed_jwt, "access_token")
+            finally
+                isnothing(old_enforce) ? delete!(ENV, "OrionAuth_ENFORCE_EMAIL_CONFIRMATION") : ENV["OrionAuth_ENFORCE_EMAIL_CONFIRMATION"] = old_enforce
+                set_email_sender!(nothing)
+                set_verification_email_template!(default_template)
             end
         end
     end

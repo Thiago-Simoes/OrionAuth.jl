@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.0] - 2025-05-11
+### Added
+- Argon2id password hashing backed by libsodium with a pluggable algorithm registry (`register_password_algorithm!`, `set_default_password_algorithm!`).
+- Configurable email verification pipeline with Mustache templates, resend support, and user-defined delivery callbacks.
+### Changed
+- Signup flow now conditionally requires email confirmation before issuing JWTs when `OrionAuth_ENFORCE_EMAIL_CONFIRMATION=true`.
+- Documentation refreshed to cover new configuration variables and workflows.
+
 ## [0.5.0] - 2025-08-07
 At this point, we’re at a usable stage. OrionAuth should be used with caution;
 it provides only the bare minimum and is intended for small projects, internal systems, and testing
@@ -28,7 +36,7 @@ it provides only the bare minimum and is intended for small projects, internal s
 - Basic password hashing and model definitions.
 
 ## Upcoming
-- Implement Argon2 or bcrypt
+- Add alternative password hashing algorithms (e.g., bcrypt) for expanded compatibility.
 - Admin monitoring dashboard for real-time audit trails and analytics.
 - Multi-factor authentication for additional login security.
 - Integration with third-party identity providers for federated login.

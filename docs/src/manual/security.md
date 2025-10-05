@@ -48,33 +48,43 @@ OrionAuth uses JSON Web Tokens for managing user sessions in a stateless manner.
 
 OrionAuth prioritizes strong password protection.
 
-* **Hashing Algorithm:** Uses `SHA512` for hashing passwords.
-* **Salting:** A cryptographically strong, unique 32-byte random salt (generated using `Random.randstring(RandomDevice(), 32)`) is created for each password.
-* **Iterations:** The SHA512 hashing process is iterated multiple times to increase computational cost for attackers. The minimum number of iterations is configurable via `ENV["OrionAuth_MIN_PASSWORD_ITTERATIONS"]` (defaults to 25000, actual iterations randomized between min and 2*min).
-* **Storage Format:** Passwords are stored in the database in the format: `"sha512&<hashed_password_hex>&<salt_string>&<iterations_count>"`.
-* **Constant-Time Comparison (Recommendation):** For maximum protection against timing attacks during password verification, it is best practice to use a constant-time string/byte comparison function. While OrionAuth's current password verification (`__ORION__VerifyPassword`) uses standard string comparison, applications with very high-security requirements should consider if further measures are needed at the application or library level.
-* **Future Enhancements:** Support for more modern key derivation functions like Argon2id or bcrypt is listed in "Upcoming Features" in the README.
+* **Hashing Algorithm:** Uses `Argon2id` (via `libsodium`) by default, producing self-contained hashes (`$argon2id$...`) with embedded parameters and salt.
+* **Parameter Customization:** Tuning knobs are exposed through the environment variables `OrionAuth_ARGON2_OPSLIMIT` and `OrionAuth_ARGON2_MEMLIMIT`, allowing deployments to increase computational cost for high-assurance environments.
+* **Extensibility:** Additional algorithms can be registered at runtime through `OrionAuth.register_password_algorithm!` and selected via `OrionAuth_PASSWORD_ALGORITHM`, ensuring future compatibility without breaking stored credentials.
+* **Legacy Compatibility:** Existing SHA-512 hashes (`sha512&<hash>&<salt>&<iterations>`) remain valid. OrionAuth automatically detects and verifies them, enabling seamless migrations from earlier versions.
+* **Salting & Iterations (SHA-512):** When the legacy algorithm is selected, a cryptographically strong 32-byte salt is used with configurable iteration counts via `OrionAuth_MIN_PASSWORD_ITTERATIONS`.
+* **Comparison Guidance:** For maximum protection against timing attacks during password verification, consider constant-time comparison helpers when integrating OrionAuth into high-security contexts.
 
-### 2.3 Secrets Management (Application/Infrastructure Responsibility)
+### 2.3 Email Verification Flow
+
+OrionAuth now ships with a customizable email-verification workflow.
+
+* **Enforcement Toggle:** Set `OrionAuth_ENFORCE_EMAIL_CONFIRMATION=true` to require email confirmation before authentication succeeds. When disabled, sign-ups immediately return a login token (legacy behaviour).
+* **Token Delivery:** Provide a callback via `OrionAuth.set_email_sender!` that receives a `VerificationEmail` structure (`to`, `subject`, `body`, and the rendering context). Return `nothing`/`Bool` to indicate dispatch status.
+* **Template Customization:** Use `OrionAuth.set_verification_email_template!` with an `EmailTemplate` instance. Both subject and body support Mustache placeholders such as `{{token}}`, `{{name}}`, and `{{verification_url}}`. The URL is composed from `OrionAuth_EMAIL_VERIFICATION_URL` (if set) or left blank for manual handling.
+* **Token TTL & Resend:** Control expiration via `OrionAuth_EMAIL_VERIFICATION_TTL` (seconds). Consumers can expose "resend" UX by calling `OrionAuth.resend_verification_token(email)`.
+* **Verification Endpoint:** Validate tokens with `OrionAuth.verify_email(token)`; successful verification promotes the account and removes stale tokens.
+
+### 2.4 Secrets Management (Application/Infrastructure Responsibility)
 
 * The `OrionAuth_SECRET` (for JWT signing), database credentials, and any other sensitive keys used by your application should be managed પાણી.
 * **Recommendation:** Store these secrets in a dedicated secrets management solution (e.g., HashiCorp Vault, AWS Secrets Manager, Azure Key Vault). Do not hardcode them or commit them to version control.
 * Regularly rotate secrets and audit access logs according to your organization's security policy.
 
-### 2.4 Transport Security (Application/Infrastructure Responsibility)
+### 2.5 Transport Security (Application/Infrastructure Responsibility)
 
 * **Recommendation:** Enforce `TLS 1.2` or higher (HTTPS) for all endpoints that handle authentication requests or transmit JWTs.
 * Implement HTTP Strict Transport Security (HSTS) headers to ensure browsers only connect via HTTPS.
 * A reverse proxy (e.g., NGINX, Traefik, Caddy) can be used for TLS termination, certificate management, and potentially as a first line of defense for rate limiting.
 
-### 2.5 Data Encryption At Rest (Application/Infrastructure Responsibility - for general application data)
+### 2.6 Data Encryption At Rest (Application/Infrastructure Responsibility - for general application data)
 
 * OrionAuth itself does not encrypt general application data stored by your system (e.g., user profile information beyond authentication details, application-specific sensitive data).
 * **Recommendation:**
     * **Field-Level Encryption:** For highly sensitive fields in your database, consider encrypting them before insertion (e.g., using AES-GCM via `Nettle.jl` or another cryptographic library).
     * **Database Encryption:** Utilize disk-level encryption provided by your database system or cloud provider (e.g., LUKS, AWS EBS encryption, Azure Disk Encryption).
 
-### 2.6 Audit Logging (OrionAuth Feature)
+### 2.7 Audit Logging (OrionAuth Feature)
 
 OrionAuth includes basic audit logging capabilities.
 
@@ -87,7 +97,7 @@ OrionAuth includes basic audit logging capabilities.
     ```
 * **Log Retention (Application Policy):** Log retention periods and backup strategies should be defined by your organization's policies and compliance requirements.
 
-### 2.7 Access Controls (OrionAuth Feature)
+### 2.8 Access Controls (OrionAuth Feature)
 
 OrionAuth provides a Role-Based Access Control (RBAC) system.
 
@@ -95,12 +105,12 @@ OrionAuth provides a Role-Based Access Control (RBAC) system.
 * **Functionality:** Provides functions to assign roles to users (`AssignRoleToUser`), assign permissions to roles (via `SyncRolesAndPermissions` or direct table manipulation), assign direct permissions to users (`AssignPermissionToUser`), and check user permissions (`CheckPermission`, `GetUserPermissions`).
 * **Database Hardening (Recommendation):** Complement OrionAuth's RBAC by configuring restrictive database grants for your application's database user, minimizing privileges on critical tables (e.g., restricting `DROP`/`DELETE` on core auth tables).
 
-### 2.8 Rate Limiting and Brute-Force Protection (Planned / Application or Infrastructure Responsibility for V1)
+### 2.9 Rate Limiting and Brute-Force Protection (Planned / Application or Infrastructure Responsibility for V1)
 
 * **OrionAuth Package:** Rate limiting and advanced brute-force protection (like account lockout after N failed attempts) are listed as "Upcoming Features" in the README for direct inclusion in the package.
 * **For V1 / Current Implementation:** It is highly recommended to implement these protections at the application layer or using infrastructure tools (e.g., a reverse proxy, WAF). This includes limiting login attempts per IP and/or per user account.
 
-### 2.9 Multi-Factor Authentication (MFA) (Planned)
+### 2.10 Multi-Factor Authentication (MFA) (Planned)
 
 * **OrionAuth Package:** MFA (e.g., TOTP via RFC 6238) is listed as an "Upcoming Feature" in the README.
 * **Current Implementation:** For V1, if MFA is required, it would need to be integrated as a separate layer by the consuming application.

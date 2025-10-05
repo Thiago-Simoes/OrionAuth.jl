@@ -1,3 +1,175 @@
+Base.@kwdef struct EmailTemplate
+    subject::String
+    body::String
+end
+
+struct VerificationEmail
+    to::String
+    subject::String
+    body::String
+    context::Dict{String,Any}
+end
+
+const EMAIL_SENDER = Base.RefValue{Union{Nothing,Function}}(nothing)
+const VERIFICATION_EMAIL_TEMPLATE = Base.RefValue{EmailTemplate}(EmailTemplate(
+    subject = "Confirme seu acesso",
+    body = """
+Olá {{name}},
+
+Recebemos o seu cadastro no OrionAuth.
+Use o código {{token}} ou acesse {{verification_url}} para confirmar a sua conta.
+
+Obrigado,
+Equipe OrionAuth
+""",
+))
+
+email_confirmation_enforced() = lowercase(get(ENV, "OrionAuth_ENFORCE_EMAIL_CONFIRMATION", "false")) in ("1", "true", "yes" )
+
+function verification_token_ttl()
+    raw = get(ENV, "OrionAuth_EMAIL_VERIFICATION_TTL", "86400")
+    ttl = try
+        parse(Int, raw)
+    catch
+        86_400
+    end
+    max(ttl, 60)
+end
+
+function verification_base_url()
+    get(ENV, "OrionAuth_EMAIL_VERIFICATION_URL", "")
+end
+
+function generate_verification_token()
+    Random.randstring(RandomDevice(), PASSWORD_TOKEN_ALPHABET, 48)
+end
+
+function set_email_sender!(sender::Union{Function,Nothing})
+    EMAIL_SENDER[] = sender
+    return sender
+end
+
+function set_verification_email_template!(template::EmailTemplate)
+    VERIFICATION_EMAIL_TEMPLATE[] = template
+    return template
+end
+
+function build_verification_context(user, token::String; extra::Dict{String,Any}=Dict{String,Any}())
+    url_base = verification_base_url()
+    verification_url = isempty(url_base) ? "" : string(url_base, occursin('?', url_base) ? "&" : "?", "token=", token)
+
+    context = Dict{String,Any}(
+        "token" => token,
+        "verification_url" => verification_url,
+        "email" => user.email,
+        "name" => user.name,
+        "user_id" => user.id,
+        "uuid" => user.uuid,
+    )
+
+    merge!(context, extra)
+    return context
+end
+
+function render_verification_email(user, token::String; extra::Dict{String,Any}=Dict{String,Any}())
+    template = VERIFICATION_EMAIL_TEMPLATE[]
+    context = build_verification_context(user, token; extra)
+    subject = Mustache.render(template.subject, context)
+    body = Mustache.render(template.body, context)
+    return subject, body, context
+end
+
+function dispatch_verification_email(user, token::String)
+    sender = EMAIL_SENDER[]
+    isnothing(sender) && return nothing
+
+    subject, body, context = render_verification_email(user, token)
+    email = VerificationEmail(user.email, subject, body, context)
+    sender(email)
+end
+
+function maybe_create_verification_record(user)
+    if !email_confirmation_enforced()
+        return nothing
+    end
+
+    deleteMany(OrionAuth_EmailVerification, Dict("where" => Dict("userId" => user.id)))
+
+    token = generate_verification_token()
+    create(OrionAuth_EmailVerification, Dict(
+        "userId" => user.id,
+        "token" => token,
+        "created_at" => string(Dates.now()),
+    ))
+
+    dispatch_verification_email(user, token)
+    return token
+end
+
+function verification_record_expired(record)
+    ttl_seconds = verification_token_ttl()
+    created_at = try
+        Dates.DateTime(record.created_at)
+    catch
+        return false
+    end
+
+    created_at + Dates.Second(ttl_seconds) < Dates.now()
+end
+
+function verify_email(token::String)
+    record = findFirst(OrionAuth_EmailVerification; query=Dict("where" => Dict("token" => token)))
+    if isnothing(record)
+        error("Invalid verification token")
+    end
+
+    if verification_record_expired(record)
+        deleteMany(OrionAuth_EmailVerification, Dict("where" => Dict("id" => record.id)))
+        error("Verification token expired")
+    end
+
+    update(OrionAuth_User, Dict(
+        "set" => Dict("email_confirmed" => true),
+        "where" => Dict("id" => record.userId),
+    ))
+
+    deleteMany(OrionAuth_EmailVerification, Dict("where" => Dict("userId" => record.userId)))
+    @async LogAction("verify_email", record.userId)
+    return findFirst(OrionAuth_User; query=Dict("where" => Dict("id" => record.userId)))
+end
+
+function resend_verification_token(email::String)
+    user = findFirst(OrionAuth_User; query=Dict("where" => Dict("email" => email)))
+    if isnothing(user)
+        error("User not found")
+    end
+
+    if !email_confirmation_enforced()
+        return nothing
+    end
+
+    if user.email_confirmed
+        return nothing
+    end
+
+    token = maybe_create_verification_record(user)
+    isnothing(token) && return nothing
+
+    @async LogAction("resend_verification", user.id)
+    return token
+end
+
+
+function user_email_confirmed(user)
+    if hasproperty(user, :email_confirmed)
+        return getproperty(user, :email_confirmed)
+    elseif isa(user, AbstractDict)
+        return get(user, :email_confirmed, get(user, "email_confirmed", true))
+    else
+        return true
+    end
+end
+
 
 function LogAction(action::String, user)
     return LogAction(action, user.id)
@@ -14,17 +186,28 @@ function signup(email::String, name::String, password::String)
     end
     uuid = string(UUIDs.uuid4())
     hashed_password = __ORION__HashPassword(password)
-    ts = string(Dates.now())
+    enforce = email_confirmation_enforced()
     newUser = create(OrionAuth_User, Dict(
         "email" => email,
         "name" => name,
         "uuid" => uuid,
-        "password" => hashed_password
+        "password" => hashed_password,
+        "email_confirmed" => !enforce,
         ))
     @async LogAction("signup", newUser.id)
-    
+
+    if enforce
+        maybe_create_verification_record(newUser)
+        @async LogAction("signup_pending_verification", newUser.id)
+        response = Dict(
+            "status" => "verification_required",
+            "email_confirmed" => false,
+        ) |> JSON3.write
+        return newUser, response
+    end
+
     payload = GenerateJWT(newUser)
-    
+
     returnData = Dict(
         "access_token" => payload,
         "token_type" => "Bearer",
@@ -39,9 +222,13 @@ function signin(email::String, password::String)
     if user === nothing
         error("User not found")
     end
-    
+
     if !__ORION__VerifyPassword(password, user.password)
         error("Invalid password")
+    end
+
+    if email_confirmation_enforced() && !user_email_confirmed(user)
+        error("Email confirmation required")
     end
     @async LogAction("signin", user.id)
 

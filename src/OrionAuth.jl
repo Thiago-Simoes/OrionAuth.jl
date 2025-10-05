@@ -10,6 +10,8 @@ using OrionORM
 using Nettle
 using Random
 using SHA
+using Mustache
+using Sodium
 using UUIDs
 using Genie
 using Genie.Requests
@@ -142,6 +144,8 @@ function init!()
     nothing
 end
 
-export Auth, signin, signup, syncRolesPermissions, assignRole, assignPermission, syncRolesAndPermissions, getUserPermissions, getUserRoles, checkPermission, removeRole, __ORION__DecodeJWT, Unauthorized, getUserData
+export Auth, signin, signup, syncRolesPermissions, assignRole, assignPermission, syncRolesAndPermissions, getUserPermissions, getUserRoles, checkPermission, removeRole, __ORION__DecodeJWT, Unauthorized, getUserData,
+       verify_email, resend_verification_token, set_email_sender!, set_verification_email_template!, EmailTemplate, VerificationEmail,
+       PasswordAlgorithm, register_password_algorithm!, set_default_password_algorithm!
 
 end # module OrionAuth
