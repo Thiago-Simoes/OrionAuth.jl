@@ -7,6 +7,7 @@
 ### Changed
 - Signup flow now conditionally requires email confirmation before issuing JWTs when `OrionAuth_ENFORCE_EMAIL_CONFIRMATION=true`.
 - Documentation refreshed to cover new configuration variables and workflows.
+- `signup` and `signin` now return `(user, response_json)`; update call sites to destructure the tuple if you previously relied on the single return value.
 
 ## [0.5.0] - 2025-08-07
 At this point, we’re at a usable stage. OrionAuth should be used with caution;

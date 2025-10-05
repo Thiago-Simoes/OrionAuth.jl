@@ -34,6 +34,21 @@ OrionAuth_EMAIL_VERIFICATION_TTL=86400
 # Optional: OrionAuth_EMAIL_VERIFICATION_URL=https://yourapp.test/verify
 ```
 
+## Database schema requirements
+
+OrionAuth relies on a set of tables that match the models declared in `OrionAuth.init!()`. When upgrading to v0.6.0 or enabling email verification, ensure the `OrionAuth_EmailVerification` table exists with the expected columns:
+
+```sql
+CREATE TABLE OrionAuth_EmailVerification (
+    id INTEGER PRIMARY KEY AUTO_INCREMENT,
+    userId INTEGER NOT NULL,
+    token TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+If you manage your schema with migrations, add the table (and a foreign-key constraint to `OrionAuth_User` when supported by your database). Existing installations on v0.5.x can run the SQL above before deploying the new release.
+
 ## Initializing the Package
 In your Julia script or REPL, load and initialize OrionAuth:
 ```julia

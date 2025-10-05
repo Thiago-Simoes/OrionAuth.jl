@@ -11,16 +11,19 @@ struct VerificationEmail
 end
 
 const EMAIL_SENDER = Base.RefValue{Union{Nothing,Function}}(nothing)
+const MIN_VERIFICATION_TTL = 60
+const VERIFICATION_TOKEN_LENGTH = 48
+
 const VERIFICATION_EMAIL_TEMPLATE = Base.RefValue{EmailTemplate}(EmailTemplate(
-    subject = "Confirme seu acesso",
+    subject = "Confirm your OrionAuth account",
     body = """
-Olá {{name}},
+Hello {{name}},
 
-Recebemos o seu cadastro no OrionAuth.
-Use o código {{token}} ou acesse {{verification_url}} para confirmar a sua conta.
+Thanks for signing up for OrionAuth.
+Use the code {{token}} or visit {{verification_url}} to confirm your account.
 
-Obrigado,
-Equipe OrionAuth
+Cheers,
+The OrionAuth Team
 """,
 ))
 
@@ -33,7 +36,7 @@ function verification_token_ttl()
     catch
         86_400
     end
-    max(ttl, 60)
+    max(ttl, MIN_VERIFICATION_TTL)
 end
 
 function verification_base_url()
@@ -41,7 +44,7 @@ function verification_base_url()
 end
 
 function generate_verification_token()
-    Random.randstring(RandomDevice(), PASSWORD_TOKEN_ALPHABET, 48)
+    Random.randstring(RandomDevice(), PASSWORD_TOKEN_ALPHABET, VERIFICATION_TOKEN_LENGTH)
 end
 
 function set_email_sender!(sender::Union{Function,Nothing})

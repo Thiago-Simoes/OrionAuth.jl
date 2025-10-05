@@ -125,7 +125,7 @@ if isempty(PASSWORD_ALGORITHMS)
     register_password_algorithm!(PasswordAlgorithm(
         "argon2id",
         password -> argon2_hash(password),
-        hashed -> startswith(hashed, "\\$argon2id\\$"),
+        hashed -> startswith(hashed, "\$argon2id\$"),
         (password, hashed) -> argon2_verify(password, hashed),
     ))
 
