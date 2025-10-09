@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.6.0] - 2025-09-16
+### Added
+- Argon2id (libsodium) as the default password hashing algorithm with environment-based selection between Argon2id and the legacy SHA-512 fallback.
+- Regression tests covering Argon2id hashing and legacy SHA-512 compatibility.
+
+### Changed
+- Exported new password helpers (`hash_password`, `verify_password`, etc.) for downstream integrations.
+- Documentation updated to reflect Argon2id defaults, legacy compatibility guidance, and the removal of the pluggable registry.
+
 ## [0.5.0] - 2025-08-07
 At this point, we’re at a usable stage. OrionAuth should be used with caution;
 it provides only the bare minimum and is intended for small projects, internal systems, and testing
@@ -28,7 +37,7 @@ it provides only the bare minimum and is intended for small projects, internal s
 - Basic password hashing and model definitions.
 
 ## Upcoming
-- Implement Argon2 or bcrypt
+- Expand password hashing presets (e.g., bcrypt) and Argon2id parameter tuning helpers
 - Admin monitoring dashboard for real-time audit trails and analytics.
 - Multi-factor authentication for additional login security.
 - Integration with third-party identity providers for federated login.

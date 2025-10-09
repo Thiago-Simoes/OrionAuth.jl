@@ -23,8 +23,9 @@ OrionAuth.jl is designed to provide simple and robust authentication and authori
 
 ### Password Storage
 
-- SHA512 + Salt with thousands of iterations.
-- Future plan: migrate to Argon2id for password hashing.
+- Argon2id (libsodium) with moderate memory & CPU cost parameters by default.
+- Environment-selectable choice between built-in Argon2id (default) and legacy SHA-512 hashing via `OrionAuth_PASSWORD_ALGORITHM`.
+- Legacy SHA-512 hashing remains available for compatibility (opt-in).
 
 ### Password Requirements and Checks
 
@@ -126,7 +127,7 @@ OrionAuth.jl is designed to provide simple and robust authentication and authori
 
 ## Roadmap (Future Plans)
 
-- Migration to Argon2id for password storage.
+- Expand optional password algorithms (e.g., bcrypt) and tooling around Argon2id parameter tuning.
 - Implement password leak and common password verification.
 - Add Multi-Factor Authentication support.
 - Add rate limiting and brute force protection mechanisms.

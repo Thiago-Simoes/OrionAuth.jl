@@ -1,6 +1,6 @@
 # OrionAuth Documentation
 
-OrionAuth is a lightweight authentication package written in Julia, designed for secure, scalable applications. It offers user creation, sign-in, JWT-based session handling, secure password hashing (SHA512 with salt), extensive logging, and auditing capabilities.
+OrionAuth is a lightweight authentication package written in Julia, designed for secure, scalable applications. It offers user creation, sign-in, JWT-based session handling, secure password hashing (Argon2id by default), extensive logging, and auditing capabilities.
 
 ## Table of Contents
 - [Installation](#installation)
@@ -44,10 +44,11 @@ OrionAuth_ALGORITHM=HS512
 OrionAuth_EXPIRATION=3600
 OrionAuth_ISSUER=OrionAuth
 OrionAuth_DBPREFIX=OrionAuth_
-OrionAuth_MIN_PASSWORD_ITTERATIONS=25000
+OrionAuth_PASSWORD_ALGORITHM=argon2id
+OrionAuth_MIN_PASSWORD_ITTERATIONS=25000 # used when `sha512` is selected
 OrionAuth_JWT_EXP=30 # in minutes
 ```
-Customize these settings based on your production environment.
+Customize these settings based on your production environment. Leave `OrionAuth_PASSWORD_ALGORITHM` at `argon2id` for the modern default; switch to `sha512` only when legacy compatibility is required.
 
 ## Usage Examples
 
@@ -122,7 +123,7 @@ println("JWT Verified: ", verified)
 - Password reset functionality with token distribution and expiration.
 - Enhanced logging, rate limiting, and multi-factor authentication.
 - Third-party identity provider integration (OAuth/OpenID Connect).
-- Support for alternative password hashing (e.g., Argon2 or bcrypt).
+- Additional password hashing presets (e.g., bcrypt) and Argon2id parameter tuning helpers.
 
 ## Contributing
 

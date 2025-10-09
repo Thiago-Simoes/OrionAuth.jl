@@ -142,6 +142,24 @@ function init!()
     nothing
 end
 
-export Auth, signin, signup, syncRolesPermissions, assignRole, assignPermission, syncRolesAndPermissions, getUserPermissions, getUserRoles, checkPermission, removeRole, __ORION__DecodeJWT, Unauthorized, getUserData
+export Auth,
+       signin,
+       signup,
+       syncRolesPermissions,
+       assignRole,
+       assignPermission,
+       syncRolesAndPermissions,
+       getUserPermissions,
+       getUserRoles,
+       checkPermission,
+       removeRole,
+       __ORION__DecodeJWT,
+       Unauthorized,
+       getUserData,
+       hash_password,
+       verify_password,
+       AbstractPasswordAlgorithm,
+       Argon2idAlgorithm,
+       LegacySHA512Algorithm
 
 end # module OrionAuth
