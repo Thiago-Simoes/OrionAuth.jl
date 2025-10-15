@@ -1,7 +1,7 @@
 using Random
 using SHA
 using Sodium
-using Logging: @warn
+using Logging
 
 abstract type AbstractPasswordAlgorithm end
 
