@@ -259,36 +259,39 @@ function Auth(ctx::RequestContext, requiredPermission::Union{String, Vector{Stri
 end
 
 """
-    Auth(requiredPermission::Union{String, Vector{String}}="") -> Dict
+    Auth(requiredPermission::Union{String, Vector{String}}=""; request=nothing) -> Dict
 
-Legacy Genie-specific authentication method.
-For new code, use Auth(ctx::RequestContext, ...).
-Requires Genie to be loaded.
+Simplified authentication with automatic context creation and error handling.
+Automatically detects the framework and creates the appropriate context.
 
 # Arguments
 - `requiredPermission::Union{String, Vector{String}}`: Optional permission(s) to check
+- `request`: Optional request object (auto-detected for Genie, required for HTTP.jl/Oxygen)
 
 # Returns
 - `Dict`: Decoded JWT payload
 
 # Throws
-- `Genie.Exceptions.ExceptionalResponse(401, ...)`: If token is missing/invalid
-- `Genie.Exceptions.ExceptionalResponse(403, ...)`: If required permission is not present
+- Framework-specific error response (automatically converted)
+
+# Examples
+```julia
+# Genie (auto-detected, no request needed)
+payload = Auth()
+payload = Auth("admin")
+
+# HTTP.jl or Oxygen (pass request)
+payload = Auth(request=req)
+payload = Auth("admin", request=req)
+```
 """
-function Auth(requiredPermission::Union{String, Vector{String}} = "")
-    if !isdefined(Main, :Genie)
-        error("Genie must be loaded to use the no-argument Auth(). Use Auth(ctx::RequestContext, ...) instead.")
-    end
+function Auth(requiredPermission::Union{String, Vector{String}} = ""; request=nothing)
     try
-        # Dynamically load Genie adapter if not yet loaded
-        if !isdefined(@__MODULE__, :GenieRequestContext)
-            include(joinpath(@__DIR__, "adapters/genie.jl"))
-        end
-        ctx = GenieRequestContext()
+        ctx = create_request_context(request)
         return Auth(ctx, requiredPermission)
     catch ex
         if ex isa ResponseException
-            throw(to_genie_response(ex))
+            throw(handle_auth_exception(ex))
         end
         rethrow()
     end
@@ -329,33 +332,36 @@ function getUserData(ctx::RequestContext)
 end
 
 """
-    getUserData() -> Dict
+    getUserData(; request=nothing) -> Dict
 
-Legacy Genie-specific method to extract user data from JWT.
-For new code, use getUserData(ctx::RequestContext).
-Requires Genie to be loaded.
+Simplified method to extract user data from JWT with automatic context creation.
+Automatically detects the framework and creates the appropriate context.
+
+# Arguments
+- `request`: Optional request object (auto-detected for Genie, required for HTTP.jl/Oxygen)
 
 # Returns
 - `Dict`: Decoded JWT payload
 
 # Throws
-- `Genie.Exceptions.ExceptionalResponse(401, ...)`: If header is missing or JWT is invalid
-- `Genie.Exceptions.ExceptionalResponse(400, ...)`: If header format is invalid
+- Framework-specific error response (automatically converted)
+
+# Examples
+```julia
+# Genie (auto-detected)
+user_data = getUserData()
+
+# HTTP.jl or Oxygen
+user_data = getUserData(request=req)
+```
 """
-function getUserData()
-    if !isdefined(Main, :Genie)
-        error("Genie must be loaded to use the no-argument getUserData(). Use getUserData(ctx::RequestContext) instead.")
-    end
+function getUserData(; request=nothing)
     try
-        # Dynamically load Genie adapter if not yet loaded
-        if !isdefined(@__MODULE__, :GenieRequestContext)
-            include(joinpath(@__DIR__, "adapters/genie.jl"))
-        end
-        ctx = GenieRequestContext()
+        ctx = create_request_context(request)
         return getUserData(ctx)
     catch ex
         if ex isa ResponseException
-            throw(to_genie_response(ex))
+            throw(handle_auth_exception(ex))
         end
         rethrow()
     end

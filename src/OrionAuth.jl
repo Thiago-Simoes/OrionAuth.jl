@@ -23,7 +23,11 @@ export RequestContext,
        ResponseException, 
        GenericRequestContext,
        get_headers,
-       extract_bearer_token
+       extract_bearer_token,
+       configure_framework!,
+       get_configured_framework,
+       create_request_context,
+       handle_auth_exception
 
 # Load adapters - HTTP.jl and Oxygen adapters always available since HTTP is a dependency
 include(joinpath(@__DIR__, "adapters/oxygen.jl"))
@@ -34,6 +38,16 @@ export HTTPRequestContext, to_http_response
 
 function init!()
     DotEnv.load!()
+
+    # Configure framework from ENV if set
+    if haskey(ENV, "ORIONAUTH_FRAMEWORK")
+        framework_str = lowercase(ENV["ORIONAUTH_FRAMEWORK"])
+        if framework_str in ["genie", "oxygen", "http", "auto"]
+            configure_framework!(Symbol(framework_str))
+        else
+            @warn "Invalid ORIONAUTH_FRAMEWORK value: $framework_str. Using auto-detection."
+        end
+    end
 
     dir = @__DIR__
     include(joinpath(dir, "bin/base64.jl"))
