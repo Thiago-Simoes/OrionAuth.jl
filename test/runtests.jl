@@ -10,6 +10,33 @@ using OrionAuth
 OrionAuth.init!()
 
 @testset verbose=true "OrionAuth" begin
+    @testset "Password hashing" begin
+        password = "correct horse battery staple"
+
+        hash = OrionAuth.hash_password(password)
+        @test startswith(hash, "\$argon2id\$")
+        @test OrionAuth.verify_password(hash, password)
+        @test !OrionAuth.verify_password(hash, "wrong password")
+
+        legacy_algo = OrionAuth.LegacySHA512Algorithm()
+        legacy_hash = ""
+        original_min = get(ENV, "OrionAuth_MIN_PASSWORD_ITTERATIONS", nothing)
+        try
+            ENV["OrionAuth_MIN_PASSWORD_ITTERATIONS"] = "1"
+            legacy_hash = OrionAuth.hash_password(password; algorithm = legacy_algo)
+        finally
+            if original_min === nothing
+                pop!(ENV, "OrionAuth_MIN_PASSWORD_ITTERATIONS", nothing)
+            else
+                ENV["OrionAuth_MIN_PASSWORD_ITTERATIONS"] = original_min
+            end
+        end
+
+        @test startswith(legacy_hash, "sha512&")
+        @test OrionAuth.verify_password(legacy_hash, password)
+        @test !OrionAuth.verify_password(legacy_hash, "wrong password")
+    end
+
     user, jwt = signup("th.simoes@proton.me", "Thiago Simões", "123456")
     userLogging, jwt = signin("th.simoes@proton.me", "123456")
     @testset verbose=true "Authentication - Login/Register" begin

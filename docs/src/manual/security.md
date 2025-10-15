@@ -2,7 +2,7 @@
 
 This document describes OrionAuth’s built-in security features, recommended configurations, and references to industry standards. Follow these guidelines to securely integrate OrionAuth into your applications, ranging from MVPs to more sensitive deployments.
 
-*Última atualização: 11 de Maio de 2025*
+*Última atualização: 16 de Setembro de 2025*
 
 ## 1. Standards and References
 
@@ -48,12 +48,10 @@ OrionAuth uses JSON Web Tokens for managing user sessions in a stateless manner.
 
 OrionAuth prioritizes strong password protection.
 
-* **Hashing Algorithm:** Uses `SHA512` for hashing passwords.
-* **Salting:** A cryptographically strong, unique 32-byte random salt (generated using `Random.randstring(RandomDevice(), 32)`) is created for each password.
-* **Iterations:** The SHA512 hashing process is iterated multiple times to increase computational cost for attackers. The minimum number of iterations is configurable via `ENV["OrionAuth_MIN_PASSWORD_ITTERATIONS"]` (defaults to 25000, actual iterations randomized between min and 2*min).
-* **Storage Format:** Passwords are stored in the database in the format: `"sha512&<hashed_password_hex>&<salt_string>&<iterations_count>"`.
-* **Constant-Time Comparison (Recommendation):** For maximum protection against timing attacks during password verification, it is best practice to use a constant-time string/byte comparison function. While OrionAuth's current password verification (`__ORION__VerifyPassword`) uses standard string comparison, applications with very high-security requirements should consider if further measures are needed at the application or library level.
-* **Future Enhancements:** Support for more modern key derivation functions like Argon2id or bcrypt is listed in "Upcoming Features" in the README.
+* **Hashing Algorithm (Default):** Uses libsodium's Argon2id implementation via `crypto_pwhash_str`, leveraging the `OPSLIMIT_MODERATE` and `MEMLIMIT_MODERATE` cost parameters by default. The algorithm is self-contained (salt + parameters + hash) and represented in the `$argon2id$...` format.
+* **Algorithm Selection:** Choose between the built-in `argon2id` (default) and legacy `sha512` implementations via `ENV["OrionAuth_PASSWORD_ALGORITHM"]` or by passing the desired algorithm object (e.g., `OrionAuth.LegacySHA512Algorithm()`) to `hash_password`.
+* **Legacy Compatibility:** Existing SHA-512 hashes (`"sha512&..."`) continue to verify successfully. Applications that still need to generate SHA-512 hashes can opt-in by selecting the `:sha512` algorithm and may tune the iteration count with `ENV["OrionAuth_MIN_PASSWORD_ITTERATIONS"]`.
+* **Constant-Time Verification:** Argon2id verification is delegated to libsodium, which performs constant-time checks internally. Legacy SHA-512 verification keeps the original iterative approach; high-security deployments should phase it out or wrap verification with additional mitigations if necessary.
 
 ### 2.3 Secrets Management (Application/Infrastructure Responsibility)
 
@@ -111,7 +109,7 @@ OrionAuth provides a Role-Based Access Control (RBAC) system.
 | :--------------------------------- | :----------------------------------------------------------------- | :------------------------------------------------------------ |
 | Security Policy Documentation      | Provides this `security.md` as a guide.                            | Formal policies, regular audits, referencing standards.       |
 | JWT Algorithm & Implementation     | Provides secure JWT (HS256/HS512) generation & verification.       | Choosing a strong `OrionAuth_SECRET`.                        |
-| Password Hashing                 | Implements SHA512 with salt & iterations.                          | Educating users on strong password creation.                |
+| Password Hashing                 | Default Argon2id via libsodium with optional legacy SHA-512 fallback. | Educating users on strong password creation.                |
 | Secret Rotation & Management       | Uses `ENV` vars for secrets; facilitates updates by app restart.   | Implement vault, schedule rotation, manage access.            |
 | Penetration Testing                | Aims for secure code; testable via its API (when used in an app).  | Conduct regular penetration tests and remediate findings.     |
 | Backup & Recovery                  | Defines database models.                                           | Implement DRP, define RPO/RTO, manage backup scripts.       |
@@ -128,9 +126,9 @@ This section provides guidance on which security features to prioritize based on
 
 | Use Case                      | Core OrionAuth Features Utilized                                    | Key Additional Concerns / Responsibilities (Company/Infra)        |
 | :---------------------------- | :------------------------------------------------------------------- | :---------------------------------------------------------------- |
-| **MVP / Prototyping** | JWT (HS512, salt, iterations), Basic Audit Logging (`OrionAuth_Log`). | TLS/HTTPS, strong `OrionAuth_SECRET`, basic ENV var management.  |
+| **MVP / Prototyping** | JWT (HS512) + Argon2id password hashing, Basic Audit Logging (`OrionAuth_Log`). | TLS/HTTPS, strong `OrionAuth_SECRET`, basic ENV var management.  |
 | **Non-Sensitive Web App** | All MVP features + robust RBAC (`GetUserPermissions`, etc.).          | Vault for secrets, basic rate limiting (app/proxy), regular dependency updates. |
-| **Medium-Sensitivity App** | All above + consider future MFA/Argon2 from OrionAuth.              | Stricter RBAC policies, SIEM integration for logs, defined log retention, field-level encryption for sensitive app data. |
-| **Fintech / Regulated App** | All above (when future features like MFA/Argon2 are available).        | Formal SOC 2/ISO 27001 controls, regular pentests, robust DRP, immutable audit pipeline, compliance reporting (PCI/GDPR as applicable), dedicated security team. |
+| **Medium-Sensitivity App** | All above + enforce Argon2id parameters review, begin MFA rollout.  | Stricter RBAC policies, SIEM integration for logs, defined log retention, field-level encryption for sensitive app data. |
+| **Fintech / Regulated App** | All above + mandatory MFA, centralized secrets, Argon2id monitoring. | Formal SOC 2/ISO 27001 controls, regular pentests, robust DRP, immutable audit pipeline, compliance reporting (PCI/GDPR as applicable), dedicated security team. |
 
 **Note:** Always adjust configurations (e.g., JWT expiration, password hashing iterations) based on your specific threat model, performance considerations, and organizational security requirements. Regularly review and update your security practices as both your application and the threat landscape evolve.

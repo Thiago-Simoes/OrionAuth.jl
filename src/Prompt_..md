@@ -442,43 +442,26 @@ end
       🔹 Conteúdo:
         ```
         using Random
-using SHA
+        using SHA
+        using Sodium
 
-# Utils for password validation and hashing
-function __ORION__HashPassword(password::String)
-    generateSalt = Random.randstring(RandomDevice(), 32)
-    nIterations = rand(parse(Int, ENV["OrionAuth_MIN_PASSWORD_ITTERATIONS"]):(parse(Int, ENV["OrionAuth_MIN_PASSWORD_ITTERATIONS"])*2))
+        abstract type AbstractPasswordAlgorithm end
 
-    hashed = "$(password)&$(generateSalt)"
-    for i in 1:nIterations
-        hashed = bytes2hex(sha512(hashed))
-    end
-    return "sha512&$(hashed)&$(generateSalt)&$(nIterations)"
-end
+        struct Argon2idAlgorithm <: AbstractPasswordAlgorithm
+            opslimit::UInt64
+            memlimit::UInt64
+        end
 
-function __ORION__VerifyPassword(password::String, hashed::String)
-    parts = split(hashed, "&")
-    if length(parts) != 4
-        return false
-    end
+        struct LegacySHA512Algorithm <: AbstractPasswordAlgorithm end
 
-    algorithm = parts[1]
-    hashedPassword = parts[2]
-    salt = parts[3]
-    nIterations = parse(Int, parts[4])
+        function hash_password(password::AbstractString; algorithm = nothing)
+            # Uses Argon2id by default (libsodium crypto_pwhash_str).
+        end
 
-    if algorithm != "sha512"
-        return false
-    end
-
-    hashed = "$(password)&$(salt)"
-    for i in 1:nIterations
-        hashed = bytes2hex(sha512(hashed))
-    end
-
-    return hashed == hashedPassword
-end
-        ```
+        function verify_password(stored::AbstractString, password::AbstractString; algorithm = nothing)::Bool
+            # Detects Argon2id hashes and falls back to legacy SHA-512 format.
+        end
+        ```        ```
 
     📄 response.jl
       🔹 Conteúdo:
