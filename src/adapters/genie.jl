@@ -1,4 +1,11 @@
 # Genie Framework Adapter
+# This file should only be included when Genie is available
+
+# Import Genie if not already imported
+if !isdefined(Main, :Genie)
+    using Genie
+    using Genie.Requests
+end
 
 """
     GenieRequestContext <: RequestContext

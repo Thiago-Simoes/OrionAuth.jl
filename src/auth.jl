@@ -156,6 +156,7 @@ end
 
 Legacy Genie-specific method. Extracts JWT from Authorization Bearer header.
 For new code, use extractBearerToken(ctx::RequestContext).
+Requires Genie to be loaded.
 
 # Returns
 - `String`: JWT token
@@ -165,7 +166,14 @@ For new code, use extractBearerToken(ctx::RequestContext).
 - `Genie.Exceptions.ExceptionalResponse(400, ...)`: If format is invalid
 """
 function extractBearerToken()
+    if !isdefined(Main, :Genie)
+        error("Genie must be loaded to use the no-argument extractBearerToken(). Use extractBearerToken(ctx::RequestContext) instead.")
+    end
     try
+        # Dynamically load Genie adapter if not yet loaded
+        if !isdefined(@__MODULE__, :GenieRequestContext)
+            include(joinpath(@__DIR__, "adapters/genie.jl"))
+        end
         ctx = GenieRequestContext()
         return extract_bearer_token(ctx)
     catch ex
@@ -255,6 +263,7 @@ end
 
 Legacy Genie-specific authentication method.
 For new code, use Auth(ctx::RequestContext, ...).
+Requires Genie to be loaded.
 
 # Arguments
 - `requiredPermission::Union{String, Vector{String}}`: Optional permission(s) to check
@@ -267,7 +276,14 @@ For new code, use Auth(ctx::RequestContext, ...).
 - `Genie.Exceptions.ExceptionalResponse(403, ...)`: If required permission is not present
 """
 function Auth(requiredPermission::Union{String, Vector{String}} = "")
+    if !isdefined(Main, :Genie)
+        error("Genie must be loaded to use the no-argument Auth(). Use Auth(ctx::RequestContext, ...) instead.")
+    end
     try
+        # Dynamically load Genie adapter if not yet loaded
+        if !isdefined(@__MODULE__, :GenieRequestContext)
+            include(joinpath(@__DIR__, "adapters/genie.jl"))
+        end
         ctx = GenieRequestContext()
         return Auth(ctx, requiredPermission)
     catch ex
@@ -317,6 +333,7 @@ end
 
 Legacy Genie-specific method to extract user data from JWT.
 For new code, use getUserData(ctx::RequestContext).
+Requires Genie to be loaded.
 
 # Returns
 - `Dict`: Decoded JWT payload
@@ -326,7 +343,14 @@ For new code, use getUserData(ctx::RequestContext).
 - `Genie.Exceptions.ExceptionalResponse(400, ...)`: If header format is invalid
 """
 function getUserData()
+    if !isdefined(Main, :Genie)
+        error("Genie must be loaded to use the no-argument getUserData(). Use getUserData(ctx::RequestContext) instead.")
+    end
     try
+        # Dynamically load Genie adapter if not yet loaded
+        if !isdefined(@__MODULE__, :GenieRequestContext)
+            include(joinpath(@__DIR__, "adapters/genie.jl"))
+        end
         ctx = GenieRequestContext()
         return getUserData(ctx)
     catch ex
