@@ -13,7 +13,7 @@ try
     
     global oxygen_available = true
     
-    OrionAuth.init!()
+    # Don't call init!() - it's already called in main test file
 catch e
     @warn "Oxygen not available, skipping Oxygen framework tests" exception=e
 end

@@ -1,10 +1,19 @@
 # Genie Framework Adapter
 # This file should only be included when Genie is available
 
-# Import Genie if not already imported
-if !isdefined(Main, :Genie)
-    using Genie
-    using Genie.Requests
+# Use Main.Genie since Genie is typically loaded in the user's namespace, not OrionAuth's
+const _genie_module = Ref{Union{Module,Nothing}}(nothing)
+
+function _get_genie()
+    if _genie_module[] === nothing
+        # Try to find Genie in Main
+        if isdefined(Main, :Genie)
+            _genie_module[] = Main.Genie
+        else
+            error("Genie must be loaded in Main before using GenieRequestContext")
+        end
+    end
+    return _genie_module[]
 end
 
 """
@@ -29,7 +38,7 @@ struct GenieRequestContext <: RequestContext
 end
 
 # Constructor that uses current Genie request
-GenieRequestContext() = GenieRequestContext(Genie.Requests.request())
+GenieRequestContext() = GenieRequestContext(_get_genie().Requests.request())
 
 """
     get_headers(ctx::GenieRequestContext) -> Dict{String,String}
@@ -56,5 +65,5 @@ Convert ResponseException to Genie ExceptionalResponse.
 - `Genie.Exceptions.ExceptionalResponse`: Genie-specific exception
 """
 function to_genie_response(ex::ResponseException)
-    return Genie.Exceptions.ExceptionalResponse(ex.status, ex.headers, ex.body)
+    return _get_genie().Exceptions.ExceptionalResponse(ex.status, ex.headers, ex.body)
 end

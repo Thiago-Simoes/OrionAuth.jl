@@ -5,8 +5,7 @@ using JSON3
 using OrionAuth
 using OrionORM
 
-# Initialize OrionAuth
-OrionAuth.init!()
+# Don't call init!() - it's already called in main test file
 
 @testset verbose=true "Framework-Agnostic Core" begin
     # Create test user

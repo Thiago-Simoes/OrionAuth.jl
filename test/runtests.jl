@@ -8,10 +8,10 @@ using OrionORM
 
 using OrionAuth
 
-# Load Genie adapter since Genie is available
+# Load Genie adapter manually since Genie is already loaded
+# This prevents the adapter from being loaded twice
 if !isdefined(OrionAuth, :GenieRequestContext)
-    include(joinpath(dirname(pathof(OrionAuth)), "adapters/genie.jl"))
-    @eval OrionAuth export GenieRequestContext, to_genie_response
+    Base.include(OrionAuth, joinpath(dirname(pathof(OrionAuth)), "adapters/genie.jl"))
 end
 
 OrionAuth.init!()

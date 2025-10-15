@@ -6,8 +6,7 @@ using JSON3
 using OrionAuth
 using OrionORM
 
-# Initialize OrionAuth
-OrionAuth.init!()
+# Don't call init!() - it's already called in main test file
 
 @testset verbose=true "HTTP.jl Framework Integration" begin
     # Create test user for HTTP.jl tests
