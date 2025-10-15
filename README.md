@@ -38,6 +38,25 @@ julia> import Pkg; Pkg.add("https://github.com/Thiago-Simoes/OrionAuth.jl")
 
 ## Quick Start
 
+### Configuration
+
+OrionAuth can be configured to work with your framework of choice:
+
+**Option 1: Environment Variable (Recommended)**
+```env
+# In your .env file
+ORIONAUTH_FRAMEWORK=genie  # or: oxygen, http, auto
+```
+
+**Option 2: Explicit Configuration**
+```julia
+using OrionAuth
+configure_framework!(:genie)  # :oxygen, :http, or :auto
+```
+
+**Option 3: Auto-Detection (Default)**
+OrionAuth automatically detects your framework when you use it.
+
 ### With Genie.jl
 
 ```julia
@@ -47,7 +66,7 @@ using OrionAuth
 # Initialize OrionAuth
 OrionAuth.init!()
 
-# Load Genie adapter (automatically done when Genie is loaded first)
+# Load Genie adapter
 Base.include(OrionAuth, joinpath(dirname(pathof(OrionAuth)), "adapters/genie.jl"))
 
 # Public route - signup/signin
@@ -63,15 +82,15 @@ route("/api/auth/signin") do
     return jwt_data
 end
 
-# Protected route - requires authentication
+# Protected route - auto-detects context, auto-handles errors!
 route("/api/protected") do
-    payload = Auth()  # Throws 401 if not authenticated
+    payload = Auth()  # That's it! No manual context or error handling
     return "Welcome, \$(payload["name"])!"
 end
 
 # Permission-protected route
 route("/api/admin") do
-    payload = Auth("admin")  # Requires "admin" permission
+    payload = Auth("admin")  # Automatically throws Genie exception if unauthorized
     return "Admin access granted"
 end
 
@@ -87,6 +106,9 @@ using OrionAuth
 
 # Initialize OrionAuth
 OrionAuth.init!()
+
+# Configure framework (or set ORIONAUTH_FRAMEWORK=http in .env)
+configure_framework!(:http)
 
 # Create HTTP server
 HTTP.serve("127.0.0.1", 8080) do req
@@ -104,19 +126,11 @@ HTTP.serve("127.0.0.1", 8080) do req
         return HTTP.Response(200, jwt_data)
     end
     
-    # Protected endpoint
+    # Protected endpoint - simplified!
     if req.target == "/protected"
-        ctx = HTTPRequestContext(req)
-        try
-            payload = Auth(ctx)
-            response_data = JSON3.write(Dict("message" => "Welcome, \$(payload["name"])!"))
-            return HTTP.Response(200, response_data)
-        catch ex
-            if ex isa ResponseException
-                return to_http_response(ex)
-            end
-            rethrow()
-        end
+        payload = Auth(request=req)  # Auto-converts errors to HTTP.Response!
+        response_data = JSON3.write(Dict("message" => "Welcome, \$(payload["name"])!"))
+        return HTTP.Response(200, response_data)
     end
     
     return HTTP.Response(404, "Not Found")
@@ -133,6 +147,9 @@ using OrionAuth
 # Initialize OrionAuth
 OrionAuth.init!()
 
+# Configure framework (or set ORIONAUTH_FRAMEWORK=oxygen in .env)
+configure_framework!(:oxygen)
+
 # Signup route
 @post "/signup" function(req)
     data = JSON3.read(String(req.body))
@@ -147,18 +164,10 @@ end
     return json(jwt_data)
 end
 
-# Protected route
+# Protected route - simplified!
 @get "/protected" function(req)
-    ctx = OxygenRequestContext(req)
-    try
-        payload = Auth(ctx)
-        return json(Dict("message" => "Welcome, \$(payload["name"])!"))
-    catch ex
-        if ex isa ResponseException
-            return to_oxygen_response(ex)
-        end
-        rethrow()
-    end
+    payload = Auth(request=req)  # Auto-converts errors to HTTP.Response!
+    return json(Dict("message" => "Welcome, \$(payload["name"])!"))
 end
 
 serve()
@@ -166,9 +175,33 @@ serve()
 
 ## Core Concepts
 
-### Request Context
+### Simplified API (Recommended)
 
-OrionAuth uses a `RequestContext` abstraction to work with different frameworks:
+OrionAuth now provides a simplified API that eliminates repetition:
+
+```julia
+# Genie - no context creation needed!
+route("/api/users") do
+    payload = Auth("admin")  # Auto-detects, auto-handles errors
+    # ... your code
+end
+
+# HTTP.jl / Oxygen - just pass the request
+HTTP.serve() do req
+    payload = Auth("admin", request=req)  # Auto-converts errors
+    # ... your code
+end
+```
+
+**Benefits:**
+- ✅ No manual context creation in every route (DRY!)
+- ✅ Automatic error conversion to framework-specific format
+- ✅ Configure once, use everywhere
+- ✅ Backward compatible with explicit context API
+
+### Request Context (Advanced)
+
+For advanced use cases, you can still use explicit contexts:
 
 ```julia
 # Generic context (for testing or custom frameworks)
@@ -182,19 +215,31 @@ ctx = HTTPRequestContext(req)
 
 # Oxygen context
 ctx = OxygenRequestContext(req)
+
+# Use with explicit context
+payload = Auth(ctx, "admin")
 ```
 
 ### Authentication
 
+**Simplified (Recommended):**
 ```julia
-# Basic authentication - verifies JWT and returns payload
-payload = Auth(ctx)
-user_id = payload["sub"]
-user_email = payload["email"]
+# Genie
+payload = Auth()                    # Basic auth
+payload = Auth("admin")             # With permission
+payload = Auth(["read", "write"])   # Multiple permissions
 
-# With permission check
-payload = Auth(ctx, "admin")  # Requires "admin" permission
-payload = Auth(ctx, ["read", "write"])  # Requires both permissions
+# HTTP.jl / Oxygen
+payload = Auth(request=req)
+payload = Auth("admin", request=req)
+```
+
+**Explicit Context (Advanced):**
+```julia
+ctx = GenieRequestContext()
+payload = Auth(ctx)
+payload = Auth(ctx, "admin")
+payload = Auth(ctx, ["read", "write"])
 ```
 
 ### Roles and Permissions
@@ -245,32 +290,58 @@ OrionAuth_PASSWORD_ALGORITHM=argon2id  # or sha512
 
 ### For Existing Genie Users
 
-If you're currently using OrionAuth with Genie, your code will continue to work with backward compatibility:
+Your existing code continues to work! OrionAuth now offers even simpler APIs:
 
-**Old way (still works):**
+**Original (still works):**
 ```julia
 route("/protected") do
-    Auth()  # Uses Genie.Requests.request() internally
+    Auth()  # Works exactly as before
     return "Protected"
 end
 ```
 
-**New way (recommended):**
+**Even Simpler (new):**
+No changes needed! The simplified API is already what you're using. But now you can configure the framework once and it auto-handles errors:
+
+```julia
+# Configure once at startup (optional - auto-detects Genie)
+configure_framework!(:genie)
+
+# Or in .env
+ORIONAUTH_FRAMEWORK=genie
+
+# Then in all routes - same simple code, but errors auto-convert!
+route("/protected") do
+    Auth()  # Auto-detects context, auto-converts errors
+    return "Protected"
+end
+```
+
+**Manual Context (advanced, if needed):**
 ```julia
 route("/protected") do
     ctx = GenieRequestContext()
-    Auth(ctx)
+    Auth(ctx)  # Explicit context
     return "Protected"
 end
 ```
 
-The new approach makes testing easier and allows you to potentially migrate to other frameworks in the future.
+### Comparison: Before vs After
+
+| **Before** | **After (Simplified)** |
+|------------|------------------------|
+| `ctx = GenieRequestContext(); try { Auth(ctx) } catch...` | `Auth()` |
+| Manual error handling in every route | Automatic error conversion |
+| Repeat context creation everywhere | Configure once, use everywhere |
 
 ## Configuration
 
 OrionAuth uses environment variables for configuration. Create a `.env` file:
 
 ```env
+# Framework Configuration (Optional - auto-detects if not set)
+ORIONAUTH_FRAMEWORK=genie  # Options: genie, oxygen, http, auto
+
 # Database Configuration
 DB_HOST=localhost
 DB_USER=root
