@@ -11,12 +11,40 @@ using Nettle
 using Random
 using SHA
 using UUIDs
-using Genie
-using Genie.Requests
 
 # Initialize .env
 DotEnv.load!()
 
+# Load HTTP abstraction layer first
+include(joinpath(@__DIR__, "http_adapter.jl"))
+
+# Export abstraction types and functions
+export RequestContext, 
+       ResponseException, 
+       GenericRequestContext,
+       get_headers,
+       extract_bearer_token
+
+# Load adapters conditionally when frameworks are available
+function __init__()
+    # Load Genie adapter if Genie is available
+    if isdefined(Base, :get_extension) || isdefined(@__MODULE__, :Genie)
+        try
+            @eval using Genie
+            @eval using Genie.Requests
+            @eval include(joinpath(@__DIR__, "adapters/genie.jl"))
+            @eval export GenieRequestContext, to_genie_response
+        catch
+            @debug "Genie not available, skipping Genie adapter"
+        end
+    end
+    
+    # Note: Oxygen and HTTP.jl adapters are always available since HTTP is a dependency
+    @eval include(joinpath(@__DIR__, "adapters/oxygen.jl"))
+    @eval include(joinpath(@__DIR__, "adapters/http.jl"))
+    @eval export OxygenRequestContext, to_oxygen_response
+    @eval export HTTPRequestContext, to_http_response
+end
 
 function init!()
     DotEnv.load!()
