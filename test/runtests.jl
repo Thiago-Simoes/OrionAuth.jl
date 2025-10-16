@@ -7,9 +7,21 @@ using Genie.Router
 using OrionORM
 
 using OrionAuth
+
+# Load Genie adapter manually since Genie is already loaded
+# This prevents the adapter from being loaded twice
+if !isdefined(OrionAuth, :GenieRequestContext)
+    Base.include(OrionAuth, joinpath(dirname(pathof(OrionAuth)), "adapters/genie.jl"))
+end
+
 OrionAuth.init!()
 
 @testset verbose=true "OrionAuth" begin
+    # Include framework-agnostic tests
+    include("test_generic.jl")
+    include("test_httpjl.jl")
+    include("test_oxygen.jl")
+    
     @testset "Password hashing" begin
         password = "correct horse battery staple"
 

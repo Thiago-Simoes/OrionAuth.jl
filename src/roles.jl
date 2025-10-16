@@ -1,8 +1,25 @@
-
 """
-    assign_role(user_id::Int, role::String)
+    assignRole(user_id::Int, role::String) -> OrionAuth_UserRole
 
 Assign a role to a user.
+
+# Arguments
+- `user_id::Int`: User ID (e.g., 1)
+- `role::String`: Role name (e.g., "admin")
+
+# Returns
+- `OrionAuth_UserRole`: The created user-role association record
+
+# Throws
+- `error("User not found")`: If user ID doesn't exist
+- `error("Role not found")`: If role name doesn't exist
+- `error("User already has this role")`: If role is already assigned
+
+# Examples
+```julia
+assignRole(123, "admin")
+assignRole(456, "moderator")
+```
 """
 function assignRole(user_id::Int, role::String)
     # Check if user exists
@@ -34,6 +51,28 @@ function assignRole(user_id::Int, role::String)
     return new_user_role    
 end
 
+"""
+    removeRole(user_id::Int, role::String) -> Bool
+
+Remove a role from a user.
+
+# Arguments
+- `user_id::Int`: User ID (e.g., 1)
+- `role::String`: Role name to remove (e.g., "admin")
+
+# Returns
+- `Bool`: true if role was successfully removed
+
+# Throws
+- `error("User not found")`: If user ID doesn't exist
+- `error("Role not found")`: If role name doesn't exist
+- `error("User does not have this role")`: If user doesn't have the role
+
+# Examples
+```julia
+removeRole(123, "admin")
+```
+"""
 function removeRole(user_id::Int, role::String)
     # Check if user exists
     user = findFirst(OrionAuth_User; query=Dict("where" => Dict("id" => user_id)))
@@ -61,6 +100,28 @@ function removeRole(user_id::Int, role::String)
     return true
 end
 
+"""
+    getUserRoles(user_id::Int) -> Vector
+
+Get all roles assigned to a user.
+
+# Arguments
+- `user_id::Int`: User ID (e.g., 1)
+
+# Returns
+- `Vector`: List of user role records, or empty array if no roles
+
+# Throws
+- `error("User not found")`: If user ID doesn't exist
+
+# Examples
+```julia
+roles = getUserRoles(123)
+for role in roles
+    println(role.roleId)
+end
+```
+"""
 function getUserRoles(user_id::Int)
     # Check if user exists
     user = findFirst(OrionAuth_User; query=Dict("where" => Dict("id" => user_id), "include" => [OrionAuth_UserRole]))
@@ -80,6 +141,29 @@ function getUserRoles(user_id::Int)
     return roles
 end
 
+"""
+    assignPermission(user_id::Int, permission::String) -> OrionAuth_UserPermission
+
+Assign a permission directly to a user (not through a role).
+
+# Arguments
+- `user_id::Int`: User ID (e.g., 1)
+- `permission::String`: Permission name (e.g., "read")
+
+# Returns
+- `OrionAuth_UserPermission`: The created user-permission association record
+
+# Throws
+- `error("User not found")`: If user ID doesn't exist
+- `error("Permission not found")`: If permission name doesn't exist
+- `error("User already has this permission")`: If permission is already assigned
+
+# Examples
+```julia
+assignPermission(123, "read")
+assignPermission(456, "write")
+```
+"""
 function assignPermission(user_id::Int, permission::String)
     # Check if user exists
     user = findFirst(OrionAuth_User; query=Dict("where" => Dict("id" => user_id), "include" => [OrionAuth_UserPermission]))
@@ -116,6 +200,27 @@ function assignPermission(user_id::Int, permission::String)
     return new_user_permission    
 end
 
+"""
+    removePermission(user_id::Int, permission::String) -> Bool
+
+Remove a directly assigned permission from a user.
+
+# Arguments
+- `user_id::Int`: User ID (e.g., 1)
+- `permission::String`: Permission name to remove (e.g., "read")
+
+# Returns
+- `Bool`: true if permission was successfully removed
+
+# Throws
+- `error("User not found")`: If user ID doesn't exist
+- `error("Permission not found")`: If user doesn't have the permission
+
+# Examples
+```julia
+removePermission(123, "read")
+```
+"""
 function removePermission(user_id::Int, permission::String)
     # Check if user exists
     user = findFirst(OrionAuth_User; query=Dict("where" => Dict("id" => user_id), "include" => [OrionAuth_UserPermission]))
@@ -146,6 +251,28 @@ function removePermission(user_id::Int, permission::String)
     return true
 end
 
+"""
+    getUserPermissions(user_id::Int) -> Vector
+
+Get all permissions for a user (both direct and inherited from roles).
+
+# Arguments
+- `user_id::Int`: User ID (e.g., 1)
+
+# Returns
+- `Vector`: List of permission records with unique permissions
+
+# Throws
+- `error("User not found")`: If user ID doesn't exist
+
+# Examples
+```julia
+permissions = getUserPermissions(123)
+for perm in permissions
+    println(perm.permission)  # e.g., "read", "write", "delete"
+end
+```
+"""
 function getUserPermissions(user_id::Int)
     # Check if user exists
     user = findFirst(OrionAuth_User; query=Dict("where" => Dict("id" => user_id), "include" => [OrionAuth_UserRole, OrionAuth_UserPermission]))
@@ -192,6 +319,31 @@ function getUserPermissions(user_id::Int)
     return permissionsList
 end
 
+"""
+    checkPermission(user_id::Int, permission::String) -> Bool
+
+Check if a user has a specific permission.
+
+# Arguments
+- `user_id::Int`: User ID (e.g., 1)
+- `permission::String`: Permission name to check (e.g., "read")
+
+# Returns
+- `Bool`: true if user has the permission, false otherwise
+
+# Throws
+- `error("User not found")`: If user ID doesn't exist
+- `error("Permission not found")`: If user has no permissions at all
+
+# Examples
+```julia
+if checkPermission(123, "admin")
+    println("User is admin")
+end
+
+has_write = checkPermission(456, "write")
+```
+"""
 function checkPermission(user_id::Int, permission::String)
     # Check if user exists
     user = findFirst(OrionAuth_User; query=Dict("where" => Dict("id" => user_id)))
@@ -216,12 +368,25 @@ end
 
 
 """
-    syncRolesAndPermissions(roles::Dict{String, Vector{String}})
+    syncRolesAndPermissions(roles::Dict{String, Vector{String}}) -> Bool
 
-Sync roles and permissions from a Dict, creating any missing roles, permissions, and relations.
+Synchronize roles and permissions from a dictionary structure.
+Creates any missing roles, permissions, and their associations.
 
-Example:
+# Arguments
+- `roles::Dict{String, Vector{String}}`: Dictionary mapping role names to permission lists
 
+# Returns
+- `Bool`: true when synchronization is complete
+
+# Examples
+```julia
+syncRolesAndPermissions(Dict(
+    "admin" => ["read", "write", "delete"],
+    "user" => ["read"],
+    "moderator" => ["read", "write"]
+))
+```
 """
 function syncRolesAndPermissions(roles::Dict{String, Vector{String}})
     # Iterate over each role

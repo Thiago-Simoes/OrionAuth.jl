@@ -1,12 +1,55 @@
+"""
+    LogAction(action::String, user) -> Any
+    LogAction(action::String, userId::Int) -> Any
 
+Log a user action to the database.
+
+# Arguments
+- `action::String`: Description of the action performed
+- `user`: User object with an id field
+- `userId::Int`: User ID
+
+# Returns
+- Database record of the logged action
+
+# Examples
+```julia
+LogAction("signup", user)
+LogAction("signin", 123)
+```
+"""
 function LogAction(action::String, user)
     return LogAction(action, user.id)
 end
+
 function LogAction(action::String, userId::Int)
     ts = string(Dates.now())
     return create(OrionAuth_Log, Dict("userId"=>userId, "action"=>action, "timestamp"=>ts))
 end
 
+"""
+    signup(email::String, name::String, password::String) -> (User, String)
+
+Register a new user with email, name, and password.
+
+# Arguments
+- `email::String`: User email address (e.g., "user@example.com")
+- `name::String`: User full name (e.g., "John Doe")
+- `password::String`: Plain text password (will be hashed)
+
+# Returns
+- Tuple of (User object, JWT response JSON string)
+
+# Throws
+- `error("User already exists")`: If email is already registered
+
+# Examples
+```julia
+user, jwt_data = signup("user@example.com", "John Doe", "securepass123")
+println(user.email)  # "user@example.com"
+token = JSON3.parse(jwt_data)["access_token"]
+```
+"""
 function signup(email::String, name::String, password::String)
     existing = findFirst(OrionAuth_User; query=Dict("where" => Dict("email" => email)))
     if !isnothing(existing)
@@ -34,6 +77,28 @@ function signup(email::String, name::String, password::String)
     return newUser, returnData
 end
 
+"""
+    signin(email::String, password::String) -> (User, String)
+
+Authenticate a user with email and password.
+
+# Arguments
+- `email::String`: User email address (e.g., "user@example.com")
+- `password::String`: Plain text password
+
+# Returns
+- Tuple of (User object, JWT response JSON string)
+
+# Throws
+- `error("User not found")`: If email doesn't exist
+- `error("Invalid password")`: If password is incorrect
+
+# Examples
+```julia
+user, jwt_data = signin("user@example.com", "securepass123")
+token = JSON3.parse(jwt_data)["access_token"]
+```
+"""
 function signin(email::String, password::String)
     local user = findFirst(OrionAuth_User; query=Dict("where" => Dict("email" => email)))
     if user === nothing
@@ -56,122 +121,269 @@ function signin(email::String, password::String)
     return user, returnData
 end
 
+"""
+    extractBearerToken(ctx::RequestContext) -> String
+
+Extract JWT token from Authorization Bearer header.
+
+# Arguments
+- `ctx::RequestContext`: Request context from any supported framework
+
+# Returns
+- `String`: JWT token
+
+# Throws
+- `ResponseException(401, ...)`: If Authorization header is missing
+- `ResponseException(400, ...)`: If Authorization header format is invalid
+
+# Examples
+```julia
+# With Genie
+ctx = GenieRequestContext()
+token = extractBearerToken(ctx)
+
+# With HTTP.jl
+ctx = HTTPRequestContext(req)
+token = extractBearerToken(ctx)
+```
+"""
+function extractBearerToken(ctx::RequestContext)
+    return extract_bearer_token(ctx)
+end
 
 """
     extractBearerToken() -> String
 
-Extracts the JWT from the `Authorization: Bearer <token>` header.
-Throws 401 if header is missing, 400 if format is invalid.
+Legacy Genie-specific method. Extracts JWT from Authorization Bearer header.
+For new code, use extractBearerToken(ctx::RequestContext).
+Requires Genie to be loaded.
+
+# Returns
+- `String`: JWT token
+
+# Throws
+- `Genie.Exceptions.ExceptionalResponse(401, ...)`: If header is missing
+- `Genie.Exceptions.ExceptionalResponse(400, ...)`: If format is invalid
 """
 function extractBearerToken()
-    headers = Genie.Requests.request().headers |> Dict
-
-    auth_key = nothing
-    for k in keys(headers)
-        if lowercase(k) == "authorization"
-        auth_key = k
-        break
+    if !isdefined(Main, :Genie)
+        error("Genie must be loaded to use the no-argument extractBearerToken(). Use extractBearerToken(ctx::RequestContext) instead.")
+    end
+    try
+        # Dynamically load Genie adapter if not yet loaded
+        if !isdefined(@__MODULE__, :GenieRequestContext)
+            include(joinpath(@__DIR__, "adapters/genie.jl"))
         end
+        ctx = GenieRequestContext()
+        return extract_bearer_token(ctx)
+    catch ex
+        if ex isa ResponseException
+            throw(to_genie_response(ex))
+        end
+        rethrow()
     end
-    if isnothing(auth_key)
-        # Uses ExceptionalResponse - ExceptionalResponse(status, headers, body)
-        throw(Genie.Exceptions.ExceptionalResponse(401, [], "Authorization header is missing"))
-    end  
-
-    auth_header = headers[auth_key]
-
-    # Get JWT token from the header
-    # Split using space
-    parts = split(auth_header, " ")
-    if length(parts) != 2 || parts[1] != "Bearer"
-        throw(Genie.Exceptions.ExceptionalResponse(400, [], "Invalid Authorization header format"))
-    end
-
-    token = parts[2]
-    return token
 end
 
 """
     decodeJWT(token::AbstractString) -> Dict
 
-Decodes and verifies the JWT signature.
-Throws 401 if token is invalid or expired.
+Decode and verify JWT signature.
+
+# Arguments
+- `token::AbstractString`: JWT token string
+
+# Returns
+- `Dict`: Decoded JWT payload with user data
+
+# Throws
+- `ResponseException(401, ...)`: If token is invalid or expired
+
+# Examples
+```julia
+token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+payload = decodeJWT(token)
+println(payload["email"])
+```
 """
 function decodeJWT(token::AbstractString)
     try
         return __ORION__DecodeJWT(token, ENV["OrionAuth_SECRET"])
     catch
-        throw(Genie.Exceptions.ExceptionalResponse(401, [], "Invalid or expired token"))
+        throw(ResponseException(401, [], "Invalid or expired token"))
     end
 end
 
 """
-    Auth(requiredRole::Union{String, Vector{String}}="") -> Dict
+    Auth(ctx::RequestContext, requiredPermission::Union{String, Vector{String}}="") -> Dict
 
-1. Extracts and verifies JWT.
-2. Optionally checks that the decoded payload contains the given role(s).
-3. Returns the decoded payload for further use (e.g. getUserData can just call Auth()).
+Authenticate and authorize request using JWT token.
 
-Throws:
-- 401 if token missing/invalid,
-- 403 if requiredRole is not present in user roles.
+# Arguments
+- `ctx::RequestContext`: Request context from any supported framework
+- `requiredPermission::Union{String, Vector{String}}`: Optional permission(s) to check (default: "")
+
+# Returns
+- `Dict`: Decoded JWT payload with user information
+
+# Throws
+- `ResponseException(401, ...)`: If token is missing/invalid
+- `ResponseException(403, ...)`: If required permission is not present
+
+# Examples
+```julia
+# Basic authentication
+ctx = GenieRequestContext()
+payload = Auth(ctx)
+user_id = payload["sub"]
+
+# With permission check
+payload = Auth(ctx, "admin")
+payload = Auth(ctx, ["read", "write"])
+```
 """
-function Auth(requiredPermission::Union{String, Vector{String}} = "")
-    token = extractBearerToken()
+function Auth(ctx::RequestContext, requiredPermission::Union{String, Vector{String}} = "")
+    token = extractBearerToken(ctx)
     payload = decodeJWT(token)
 
-    # normalize roles to a Vector{String}
+    # normalize permissions to a Vector{String}
     userPermissions = payload["permissions"] .|> r -> r[:permission] .|> String
 
     if requiredPermission != ""
         required = isa(requiredPermission, String) ? [requiredPermission] : requiredPermission
         if !all(r-> r in userPermissions, required)
-            throw(Genie.Exceptions.ExceptionalResponse(403, [], "Forbidden: missing role(s) $(required)"))
+            throw(ResponseException(403, [], "Forbidden: missing permission(s) $(required)"))
         end
     end
 
     return payload
 end
 
+"""
+    Auth(requiredPermission::Union{String, Vector{String}}=""; request=nothing) -> Dict
 
-function getUserData()
-    headers = Genie.Requests.request().headers |> Dict
-    # Find user by Authorization header (case insensitive)
-    auth_key = nothing
-    for k in keys(headers)
-        if lowercase(k) == "authorization"
-        auth_key = k
-        break
-        end
-    end
-    if isnothing(auth_key)
-        # Uses ExceptionalResponse - ExceptionalResponse(status, headers, body)
-        throw(Genie.Exceptions.ExceptionalResponse(401, [], "Authorization header is missing"))
-    end  
+Simplified authentication with automatic context creation and error handling.
+Automatically detects the framework and creates the appropriate context.
 
-    auth_header = headers[auth_key]
+# Arguments
+- `requiredPermission::Union{String, Vector{String}}`: Optional permission(s) to check
+- `request`: Optional request object (auto-detected for Genie, required for HTTP.jl/Oxygen)
 
-    # Get JWT token from the header
-    # Split using space
-    parts = split(auth_header, " ")
-    if length(parts) != 2 || parts[1] != "Bearer"
-        throw(Genie.Exceptions.ExceptionalResponse(400, [], "Invalid Authorization header format"))
-    end
+# Returns
+- `Dict`: Decoded JWT payload
 
-    token = parts[2]
+# Throws
+- Framework-specific error response (automatically converted)
 
-    # Decode JWT token
-    payload = nothing
+# Examples
+```julia
+# Genie (auto-detected, no request needed)
+payload = Auth()
+payload = Auth("admin")
+
+# HTTP.jl or Oxygen (pass request)
+payload = Auth(request=req)
+payload = Auth("admin", request=req)
+```
+"""
+function Auth(requiredPermission::Union{String, Vector{String}} = ""; request=nothing)
     try
-        payload = __ORION__DecodeJWT(token, ENV["OrionAuth_SECRET"]) # Auto verify signature
-    catch e
-        # Return 401 Unauthorized if JWT is invalid
-        throw(Genie.Exceptions.ExceptionalResponse(401, [], "Authorization header is missing"))
+        ctx = create_request_context(request)
+        return Auth(ctx, requiredPermission)
+    catch ex
+        if ex isa ResponseException
+            throw(handle_auth_exception(ex))
+        end
+        rethrow()
     end
-    return payload
 end
-    
 
+"""
+    getUserData(ctx::RequestContext) -> Dict
+
+Extract user data from JWT token in request.
+
+# Arguments
+- `ctx::RequestContext`: Request context from any supported framework
+
+# Returns
+- `Dict`: Decoded JWT payload with user information
+
+# Throws
+- `ResponseException(401, ...)`: If Authorization header is missing or JWT is invalid
+- `ResponseException(400, ...)`: If Authorization header format is invalid
+
+# Examples
+```julia
+ctx = HTTPRequestContext(req)
+user_data = getUserData(ctx)
+println(user_data["email"])
+```
+"""
+function getUserData(ctx::RequestContext)
+    token = extractBearerToken(ctx)
+    
+    # Decode JWT token
+    try
+        payload = __ORION__DecodeJWT(token, ENV["OrionAuth_SECRET"])
+        return payload
+    catch e
+        throw(ResponseException(401, [], "Invalid or expired token"))
+    end
+end
+
+"""
+    getUserData(; request=nothing) -> Dict
+
+Simplified method to extract user data from JWT with automatic context creation.
+Automatically detects the framework and creates the appropriate context.
+
+# Arguments
+- `request`: Optional request object (auto-detected for Genie, required for HTTP.jl/Oxygen)
+
+# Returns
+- `Dict`: Decoded JWT payload
+
+# Throws
+- Framework-specific error response (automatically converted)
+
+# Examples
+```julia
+# Genie (auto-detected)
+user_data = getUserData()
+
+# HTTP.jl or Oxygen
+user_data = getUserData(request=req)
+```
+"""
+function getUserData(; request=nothing)
+    try
+        ctx = create_request_context(request)
+        return getUserData(ctx)
+    catch ex
+        if ex isa ResponseException
+            throw(handle_auth_exception(ex))
+        end
+        rethrow()
+    end
+end
+
+"""
+    GenerateJWT(user) -> String
+
+Generate a JWT token for a user with roles and permissions.
+
+# Arguments
+- `user`: User object with id, name, email, and uuid fields
+
+# Returns
+- `String`: JWT token
+
+# Examples
+```julia
+user = findFirst(OrionAuth_User; query=Dict("where" => Dict("email" => "user@example.com")))
+token = GenerateJWT(user)
+```
+"""
 function GenerateJWT(user)
     payload = Dict("sub" => user.id, "name" => user.name, "email" => user.email, "uuid" => user.uuid, "roles" => getUserRoles(user.id), "permissions" => getUserPermissions(user.id))
     token = __ORION__EncodeJWT(payload, ENV["OrionAuth_SECRET"], ENV["OrionAuth_ALGORITHM"])
