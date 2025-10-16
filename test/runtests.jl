@@ -22,6 +22,9 @@ OrionAuth.init!()
     include("test_httpjl.jl")
     include("test_oxygen.jl")
     
+    # Password reset tests
+    include("test_password_reset.jl")
+    
     @testset "Password hashing" begin
         password = "correct horse battery staple"
 

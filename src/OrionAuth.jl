@@ -57,6 +57,7 @@ function init!()
     include(joinpath(dir, "auth.jl"))
     include(joinpath(dir, "jwt.jl"))
     include(joinpath(dir, "response.jl"))
+    include(joinpath(dir, "password_reset.jl"))
 
     @eval begin
         OrionAuth_Log = Model(
@@ -188,6 +189,9 @@ export Auth,
        verify_password,
        AbstractPasswordAlgorithm,
        Argon2idAlgorithm,
-       LegacySHA512Algorithm
+       LegacySHA512Algorithm,
+       request_password_reset,
+       verify_reset_token,
+       reset_password_with_token
 
 end # module OrionAuth
