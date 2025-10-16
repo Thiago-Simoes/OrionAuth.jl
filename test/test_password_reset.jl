@@ -1,6 +1,10 @@
 using Test
 using Dates
 using OrionAuth
+using OrionORM
+
+# Initialize OrionAuth - this must be done before using any functions
+OrionAuth.init!()
 
 @testset "Password Reset Flow" begin
     # Setup: Create a test user

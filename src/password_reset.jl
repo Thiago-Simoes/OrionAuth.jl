@@ -201,7 +201,7 @@ function reset_password_with_token(token::String, new_password::String)
     hashed_password = __ORION__HashPassword(new_password)
     
     # Update user's password
-    update(OrionAuth_User, user.id, Dict("password" => hashed_password))
+    update(OrionAuth_User, Dict("where" => Dict("id" => token_info.userId)), Dict("password" => hashed_password))
     
     # Delete the used token
     deleteMany(OrionAuth_PasswordReset, Dict("where" => Dict("id" => token_info.id)))
