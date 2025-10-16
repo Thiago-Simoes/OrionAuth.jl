@@ -9,7 +9,7 @@ using Nettle
 
 function __ORION__EncodeJWT(inputPayload::Dict, secret::AbstractString, algorithm::AbstractString="HS256")
     header = Dict("alg" => algorithm, "typ" => "JWT")
-    headerEncoded = base64encode(JSON3.write(header))
+    headerEncoded = base64url_encode(JSON3.write(header))
 
     iat = round(Int, time())
     exp = iat + (parse(Int, ENV["OrionAuth_JWT_EXP"]) * 60)
