@@ -44,12 +44,12 @@ function demo_send_mail(recipient::String, subject::String, body::String)
 end
 
 # Step 3: Request password reset
-println("Step 2: Requesting password reset...")
+println("Step 3: Requesting password reset...")
 token = request_password_reset(test_email, send_mail=demo_send_mail)
 println("✓ Password reset requested\n")
 
 # Step 4: Verify the token (optional - to check if it's valid before using)
-println("Step 3: Verifying reset token...")
+println("Step 4: Verifying reset token...")
 token_info = verify_reset_token(token)
 if !isnothing(token_info)
     println("✓ Token is valid")
@@ -60,7 +60,7 @@ else
 end
 
 # Step 5: Reset the password
-println("Step 4: Resetting password with token...")
+println("Step 5: Resetting password with token...")
 new_password = "newSecurePassword456"
 success = reset_password_with_token(token, new_password)
 
@@ -72,7 +72,7 @@ else
 end
 
 # Step 6: Verify we can sign in with the new password
-println("Step 5: Verifying new password works...")
+println("Step 6: Verifying new password works...")
 try
     signin_user, jwt_data = signin(test_email, new_password)
     println("✓ Successfully signed in with new password")
@@ -84,7 +84,7 @@ catch e
 end
 
 # Step 7: Verify old password no longer works
-println("Step 6: Verifying old password no longer works...")
+println("Step 7: Verifying old password no longer works...")
 try
     signin(test_email, "oldPassword123")
     println("✗ WARNING: Old password still works (this shouldn't happen!)\n")
@@ -99,7 +99,7 @@ catch e
 end
 
 # Step 8: Verify token can't be reused
-println("Step 7: Verifying token can't be reused...")
+println("Step 8: Verifying token can't be reused...")
 second_attempt = reset_password_with_token(token, "anotherPassword")
 if !second_attempt
     println("✓ Token correctly invalidated after use\n")
