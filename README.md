@@ -17,6 +17,7 @@ OrionAuth.jl now supports multiple web frameworks including:
 - 🔐 **JWT-based Authentication** with HS256/HS512 algorithms
 - 👥 **Role-Based Access Control (RBAC)** with permissions
 - 🔑 **Multiple Password Hashing Algorithms** (Argon2id, SHA-512 legacy)
+- 🔄 **Password Reset Flow** with secure token generation and expiration
 - 🌐 **Framework-Agnostic Design** - works with Genie, Oxygen, HTTP.jl and more
 - 📝 **Comprehensive API** with docstrings and type safety
 - ✅ **Well-Tested** with extensive test coverage
@@ -286,6 +287,206 @@ Configure the default algorithm via environment variable:
 OrionAuth_PASSWORD_ALGORITHM=argon2id  # or sha512
 ```
 
+### Password Reset
+
+OrionAuth provides a complete password reset flow with token generation, validation, and email integration:
+
+```julia
+# 1. Request password reset (without email)
+token = request_password_reset("user@example.com")
+println("Reset token: $token")
+
+# 2. Request password reset with email function
+function send_mail(recipient::String, subject::String, body::String)
+    # Integrate with your email service (e.g., SendGrid, AWS SES, SMTP)
+    # The body is HTML formatted
+    println("Sending email to: $recipient")
+    println("Subject: $subject")
+    # Your email sending logic here
+end
+
+token = request_password_reset("user@example.com", send_mail=send_mail)
+
+# 3. Verify token validity
+token_info = verify_reset_token(token)
+if !isnothing(token_info)
+    println("Token is valid for user ID: $(token_info.userId)")
+else
+    println("Token is invalid or expired")
+end
+
+# 4. Reset password with token
+success = reset_password_with_token(token, "newSecurePassword123")
+if success
+    println("Password reset successful!")
+else
+    println("Invalid or expired token")
+end
+```
+
+**Configuration:**
+```bash
+# Set token expiration time in minutes (default: 60)
+OrionAuth_PASSWORD_RESET_TOKEN_EXPIRATION=60
+```
+
+**Complete Example with Genie.jl:**
+```julia
+using Genie, Genie.Router
+using OrionAuth
+using JSON3
+
+OrionAuth.init!()
+Base.include(OrionAuth, joinpath(dirname(pathof(OrionAuth)), "adapters/genie.jl"))
+
+# Email sending function (example with SMTP)
+function send_reset_email(recipient, subject, body)
+    # Example: Use SMTPClient.jl or your preferred email service
+    # SMTPClient.send(
+    #     from="noreply@yourapp.com",
+    #     to=recipient,
+    #     subject=subject,
+    #     body=body
+    # )
+    println("Email sent to: $recipient")
+end
+
+# Request password reset endpoint
+route("/api/auth/request-password-reset", method=POST) do
+    payload = jsonpayload()
+    email = payload["email"]
+    
+    try
+        # Token is sent via email, not returned in response
+        request_password_reset(email, send_mail=send_reset_email)
+        return json(Dict("message" => "If the email exists, a reset link has been sent"))
+    catch e
+        if occursin("User not found", string(e))
+            # Return same message for security (don't reveal if email exists)
+            return json(Dict("message" => "If the email exists, a reset link has been sent"))
+        end
+        throw(Genie.Exceptions.ExceptionalResponse(500, [], "Internal server error"))
+    end
+end
+
+# Reset password endpoint
+route("/api/auth/reset-password", method=POST) do
+    payload = jsonpayload()
+    token = payload["token"]
+    new_password = payload["new_password"]
+    
+    success = reset_password_with_token(token, new_password)
+    
+    if success
+        return json(Dict("message" => "Password reset successful"))
+    else
+        throw(Genie.Exceptions.ExceptionalResponse(400, [], "Invalid or expired token"))
+    end
+end
+
+Genie.up()
+```
+
+**Complete Example with HTTP.jl:**
+```julia
+using HTTP
+using JSON3
+using OrionAuth
+
+OrionAuth.init!()
+configure_framework!(:http)
+
+function send_reset_email(recipient, subject, body)
+    println("Email sent to: $recipient")
+    # Your email integration here
+end
+
+HTTP.serve("127.0.0.1", 8080) do req
+    # Request password reset
+    if req.target == "/request-password-reset" && req.method == "POST"
+        data = JSON3.read(String(req.body))
+        
+        try
+            request_password_reset(data["email"], send_mail=send_reset_email)
+            response = JSON3.write(Dict("message" => "If the email exists, a reset link has been sent"))
+            return HTTP.Response(200, response)
+        catch e
+            response = JSON3.write(Dict("error" => "Request failed"))
+            return HTTP.Response(500, response)
+        end
+    end
+    
+    # Reset password
+    if req.target == "/reset-password" && req.method == "POST"
+        data = JSON3.read(String(req.body))
+        
+        success = reset_password_with_token(data["token"], data["new_password"])
+        
+        if success
+            response = JSON3.write(Dict("message" => "Password reset successful"))
+            return HTTP.Response(200, response)
+        else
+            response = JSON3.write(Dict("error" => "Invalid or expired token"))
+            return HTTP.Response(400, response)
+        end
+    end
+    
+    return HTTP.Response(404, "Not Found")
+end
+```
+
+**Email Function Interface:**
+
+The `send_mail` function must accept three string arguments:
+- `recipient::String`: Email address to send to
+- `subject::String`: Email subject line
+- `body::String`: Email body in HTML format
+
+Example integrations:
+```julia
+# Example 1: Console logging (for development/testing)
+function dev_send_mail(recipient, subject, body)
+    println("=" ^ 80)
+    println("TO: $recipient")
+    println("SUBJECT: $subject")
+    println("BODY:\n$body")
+    println("=" ^ 80)
+end
+
+# Example 2: SMTP integration (pseudo-code)
+using SMTPClient
+function smtp_send_mail(recipient, subject, body)
+    send(
+        server="smtp.gmail.com",
+        port=587,
+        username=ENV["SMTP_USERNAME"],
+        password=ENV["SMTP_PASSWORD"],
+        from="noreply@yourapp.com",
+        to=recipient,
+        subject=subject,
+        message=body,
+        ishtml=true
+    )
+end
+
+# Example 3: SendGrid API (pseudo-code)
+using HTTP, JSON3
+function sendgrid_send_mail(recipient, subject, body)
+    url = "https://api.sendgrid.com/v3/mail/send"
+    headers = ["Authorization" => "Bearer $(ENV["SENDGRID_API_KEY"])",
+               "Content-Type" => "application/json"]
+    
+    payload = Dict(
+        "personalizations" => [Dict("to" => [Dict("email" => recipient)])],
+        "from" => Dict("email" => "noreply@yourapp.com"),
+        "subject" => subject,
+        "content" => [Dict("type" => "text/html", "value" => body)]
+    )
+    
+    HTTP.post(url, headers, JSON3.write(payload))
+end
+```
+
 ## Migration Guide
 
 ### For Existing Genie Users
@@ -357,6 +558,9 @@ OrionAuth_JWT_EXP=30  # expiration in minutes
 # Password Configuration
 OrionAuth_PASSWORD_ALGORITHM=argon2id  # or sha512
 OrionAuth_MIN_PASSWORD_ITTERATIONS=25000  # for SHA-512 legacy
+
+# Password Reset Configuration
+OrionAuth_PASSWORD_RESET_TOKEN_EXPIRATION=60  # token expiration in minutes (default: 60)
 ```
 
 ## Documentation
