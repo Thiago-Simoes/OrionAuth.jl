@@ -16,7 +16,7 @@ end
 
 OrionAuth.init!()
 
-@testset verbose=true "OrionAuth" begin    
+@testset verbose=true "OrionAuth" begin
     @testset "Password hashing" begin
         password = "correct horse battery staple"
 
@@ -62,121 +62,173 @@ OrionAuth.init!()
             ("location", TEXT(), []),
             ("website", TEXT(), []),
             ("created_at", TEXT(), []),
-            ("updated_at", TEXT(), [])
+            ("updated_at", TEXT(), []),
         ],
-        [
-            ("userId", OrionAuth_User, "id", :belongsTo)
-        ]
+        [("userId", OrionAuth_User, "id", :belongsTo)],
     )
 
-    profile = create(Profile, Dict(
-        "userId" => user.id,
-        "bio" => "Software Engineer",
-        "location" => "Brazil",
-        "website" => "https://example.com"
-    ))
+    profile = create(
+        Profile,
+        Dict(
+            "userId" => user.id,
+            "bio" => "Software Engineer",
+            "location" => "Brazil",
+            "website" => "https://example.com",
+        ),
+    )
 
     @testset verbose=true "Relationship" begin
         @test profile.userId == user.id
         @test profile.bio == "Software Engineer"
 
         # # Testar busca
-        profile_user = findFirst(OrionAuth_User; query=Dict("where" => Dict("id" => profile.userId)))
+        profile_user =
+            findFirst(OrionAuth_User; query = Dict("where" => Dict("id" => profile.userId)))
         @test profile_user !== nothing
         @test profile_user.id == user.id
 
         # # Buscar o perfil do usuário
-        profile_user = findFirst(Profile; query=Dict("where" => Dict("userId" => user.id)))
+        profile_user =
+            findFirst(Profile; query = Dict("where" => Dict("userId" => user.id)))
         @test profile_user !== nothing
         @test profile_user.id == profile.id
         @test profile_user.userId == user.id
 
         # # Buscar pela relação
-        profile_user = findFirst(OrionAuth_User; query=Dict("where" => Dict("id" => profile.userId), "include" => [Profile]))
+        profile_user = findFirst(
+            OrionAuth_User;
+            query = Dict("where" => Dict("id" => profile.userId), "include" => [Profile]),
+        )
         @test profile_user !== nothing
         @test profile_user["OrionAuth_User"].id == user.id
         @test profile_user["Profile"][1].id == profile.id
     end
 
-    role = create(OrionAuth_Role, Dict(
-        "role" => "admin",
-        "description" => "Administrator role"
-    ))
+    role = create(
+        OrionAuth_Role,
+        Dict("role" => "admin", "description" => "Administrator role"),
+    )
 
     @testset verbose=true "Roles" begin
         @test role !== nothing
         @test role.role == "admin"
         @test role.description == "Administrator role"
 
-        role = findFirst(OrionAuth_Role; query=Dict("where" => Dict("role" => "admin")))
+        role = findFirst(OrionAuth_Role; query = Dict("where" => Dict("role" => "admin")))
         @test role !== nothing
         @test role.role == "admin"
 
         assignRole(user.id, role.role)
-        user_role = findFirst(OrionAuth_UserRole; query=Dict("where" => Dict("userId" => user.id, "roleId" => role.id)))
+        user_role = findFirst(
+            OrionAuth_UserRole;
+            query = Dict("where" => Dict("userId" => user.id, "roleId" => role.id)),
+        )
         @test user_role !== nothing
         @test user_role.userId == user.id
 
-        user_with_role = findFirst(OrionAuth_User; query=Dict("where" => Dict("id" => user.id), "include" => [OrionAuth_UserRole]))
+        user_with_role = findFirst(
+            OrionAuth_User;
+            query = Dict(
+                "where" => Dict("id" => user.id),
+                "include" => [OrionAuth_UserRole],
+            ),
+        )
         @test user_with_role !== nothing
         @test user_with_role["OrionAuth_UserRole"][1].userId == user.id
     end
 
     @testset verbose=true "Permissions - Create and assign" begin
-        permission = create(OrionAuth_Permission, Dict(
-            "permission" => "read",
-            "description" => "Read permission"
-        ))
+        permission = create(
+            OrionAuth_Permission,
+            Dict("permission" => "read", "description" => "Read permission"),
+        )
 
         @test permission !== nothing
         @test permission.permission == "read"
         @test permission.description == "Read permission"
 
-        permission = findFirst(OrionAuth_Permission; query=Dict("where" => Dict("permission" => "read")))
+        permission = findFirst(
+            OrionAuth_Permission;
+            query = Dict("where" => Dict("permission" => "read")),
+        )
         @test permission !== nothing
         @test permission.permission == "read"
 
         assignPermission(user.id, permission.permission)
-        user_permission = findFirst(OrionAuth_UserPermission; query=Dict("where" => Dict("userId" => user.id, "permissionId" => permission.id)))
+        user_permission = findFirst(
+            OrionAuth_UserPermission;
+            query = Dict(
+                "where" => Dict("userId" => user.id, "permissionId" => permission.id),
+            ),
+        )
         @test user_permission !== nothing
         @test user_permission.userId == user.id
 
-        user_with_permission = findFirst(OrionAuth_User; query=Dict("where" => Dict("id" => user.id), "include" => [OrionAuth_UserPermission]))
+        user_with_permission = findFirst(
+            OrionAuth_User;
+            query = Dict(
+                "where" => Dict("id" => user.id),
+                "include" => [OrionAuth_UserPermission],
+            ),
+        )
         @test user_with_permission !== nothing
         @test user_with_permission["OrionAuth_UserPermission"][1].userId == user.id
     end
 
     @testset verbose=true "Permissions - Inheritance" begin
-        parent_permission = create(OrionAuth_Permission, Dict(
-            "permission" => "write",
-            "description" => "Write permission"
-        ))
+        parent_permission = create(
+            OrionAuth_Permission,
+            Dict("permission" => "write", "description" => "Write permission"),
+        )
 
         @test parent_permission !== nothing
         @test parent_permission.permission == "write"
         @test parent_permission.description == "Write permission"
 
-        parent_permission = findFirst(OrionAuth_Permission; query=Dict("where" => Dict("permission" => "write")))
+        parent_permission = findFirst(
+            OrionAuth_Permission;
+            query = Dict("where" => Dict("permission" => "write")),
+        )
         @test parent_permission !== nothing
         @test parent_permission.permission == "write"
 
         deleteMany(OrionAuth_UserPermission, Dict("where" => Dict("userId" => user.id)))
 
-        syncRolesAndPermissions(Dict(
-            "admin" => ["read", "write", "delete"],
-            "user" => ["read"],
-            "god" => ["read", "write", "delete", "sudo"]
-        ))
+        syncRolesAndPermissions(
+            Dict(
+                "admin" => ["read", "write", "delete"],
+                "user" => ["read"],
+                "god" => ["read", "write", "delete", "sudo"],
+            ),
+        )
 
-        role_permission = findFirst(OrionAuth_RolePermission; query=Dict("where" => Dict("roleId" => role.id, "permissionId" => parent_permission.id)))
+        role_permission = findFirst(
+            OrionAuth_RolePermission;
+            query = Dict(
+                "where" =>
+                    Dict("roleId" => role.id, "permissionId" => parent_permission.id),
+            ),
+        )
         @test role_permission !== nothing
         @test role_permission.roleId == role.id
 
-        role_with_permission = findFirst(OrionAuth_Role; query=Dict("where" => Dict("id" => role.id), "include" => [OrionAuth_RolePermission]))
+        role_with_permission = findFirst(
+            OrionAuth_Role;
+            query = Dict(
+                "where" => Dict("id" => role.id),
+                "include" => [OrionAuth_RolePermission],
+            ),
+        )
         @test role_with_permission !== nothing
         @test role_with_permission["OrionAuth_RolePermission"][1].roleId == role.id
 
-        user_with_role_permission = findFirst(OrionAuth_User; query=Dict("where" => Dict("id" => user.id), "include" => [OrionAuth_UserRole]))
+        user_with_role_permission = findFirst(
+            OrionAuth_User;
+            query = Dict(
+                "where" => Dict("id" => user.id),
+                "include" => [OrionAuth_UserRole],
+            ),
+        )
         @test user_with_role_permission !== nothing
         @test user_with_role_permission["OrionAuth_UserRole"][1].userId == user.id
 
@@ -187,26 +239,35 @@ OrionAuth.init!()
 
     @testset verbose=true "Permissions - Direct permission" begin
         # Garantir que a permissão "sudo" existe
-        sudo_permission = findFirst(OrionAuth_Permission; query=Dict("where" => Dict("permission" => "sudo")))
+        sudo_permission = findFirst(
+            OrionAuth_Permission;
+            query = Dict("where" => Dict("permission" => "sudo")),
+        )
         if isnothing(sudo_permission)
-            sudo_permission = create(OrionAuth_Permission, Dict(
-                "permission" => "sudo",
-                "description" => "Sudo permission"
-            ))
+            sudo_permission = create(
+                OrionAuth_Permission,
+                Dict("permission" => "sudo", "description" => "Sudo permission"),
+            )
         end
-    
+
         # Add direct permission to user
         assignPermission(user.id, "sudo")
-    
-        user_with_permission = findFirst(OrionAuth_User; query=Dict("where" => Dict("id" => user.id), "include" => [OrionAuth_UserPermission]))
+
+        user_with_permission = findFirst(
+            OrionAuth_User;
+            query = Dict(
+                "where" => Dict("id" => user.id),
+                "include" => [OrionAuth_UserPermission],
+            ),
+        )
         @test user_with_permission !== nothing
         @test user_with_permission["OrionAuth_UserPermission"][1].userId == user.id
-    
+
         permissions = getUserPermissions(user.id) .|> (x -> x.permission)
         @test all([x in permissions for x in ["read", "write", "delete", "sudo"]])
         @test checkPermission(user.id, "sudo") == true
     end
-    
+
     @testset verbose=true "SignIn and SignUp - JWT" begin
         @testset verbose=true "SignUp" begin
             # Use signup function to get JWT and user
@@ -240,7 +301,13 @@ OrionAuth.init!()
             # Assign role to user
             assignRole(user.id, "admin")
             # Check if user has role, using function
-            user_with_role = findFirst(OrionAuth_User; query=Dict("where" => Dict("id" => user.id), "include" => [OrionAuth_UserRole]))
+            user_with_role = findFirst(
+                OrionAuth_User;
+                query = Dict(
+                    "where" => Dict("id" => user.id),
+                    "include" => [OrionAuth_UserRole],
+                ),
+            )
             @test user_with_role !== nothing
             @test user_with_role["OrionAuth_UserRole"][1].userId == user.id
             # Check if user has role, using function
@@ -261,7 +328,8 @@ OrionAuth.init!()
             @test haskey(decoded_payload, "exp")
 
             # Get roles from database for known name and id
-            role = findFirst(OrionAuth_Role; query=Dict("where" => Dict("role" => "admin")))
+            role =
+                findFirst(OrionAuth_Role; query = Dict("where" => Dict("role" => "admin")))
 
             # Check roles
             @test decoded_payload["roles"][1][:roleId] == role.id
@@ -317,33 +385,51 @@ OrionAuth.init!()
         initialToken = JSON3.parse(signupData)["access_token"]
 
         # 1) /protected without Authorization → should throw 401
-        @test_throws HTTP.Exceptions.StatusError HTTP.request("GET", "http://127.0.0.1:8000/protected")
+        @test_throws HTTP.Exceptions.StatusError HTTP.request(
+            "GET",
+            "http://127.0.0.1:8000/protected",
+        )
 
         # 2) /protected with bad header format → should throw 400
-        @test_throws HTTP.Exceptions.StatusError HTTP.request("GET", "http://127.0.0.1:8000/protected";
-                                                            headers = ["Authorization" => "Token $initialToken"])
+        @test_throws HTTP.Exceptions.StatusError HTTP.request(
+            "GET",
+            "http://127.0.0.1:8000/protected";
+            headers = ["Authorization" => "Token $initialToken"],
+        )
 
         # 3) /protected with valid Bearer token → 200 + correct body
-        resp = HTTP.request("GET", "http://127.0.0.1:8000/protected";
-                            headers = ["Authorization" => "Bearer $initialToken"])
+        resp = HTTP.request(
+            "GET",
+            "http://127.0.0.1:8000/protected";
+            headers = ["Authorization" => "Bearer $initialToken"],
+        )
         @test resp.status == 200
         @test String(resp.body) == "protected content"
 
         # 4) /user without Authorization → should throw 401
-        @test_throws HTTP.Exceptions.StatusError HTTP.request("GET", "http://127.0.0.1:8000/user")
+        @test_throws HTTP.Exceptions.StatusError HTTP.request(
+            "GET",
+            "http://127.0.0.1:8000/user",
+        )
 
         # 5) /user with valid token → 200 + correct payload
-        resp = HTTP.request("GET", "http://127.0.0.1:8000/user";
-                            headers = ["Authorization" => "Bearer $initialToken"])
+        resp = HTTP.request(
+            "GET",
+            "http://127.0.0.1:8000/user";
+            headers = ["Authorization" => "Bearer $initialToken"],
+        )
         @test resp.status == 200
         payload = JSON3.read(String(resp.body))
         @test payload["email"] == user.email
-        @test payload["name"]  == user.name
-        @test payload["sub"]   == user.id
+        @test payload["name"] == user.name
+        @test payload["sub"] == user.id
 
         # 6) DELETE /delete-resource without 'delete' permission → should throw 403
-        @test_throws HTTP.Exceptions.StatusError HTTP.request("DELETE", "http://127.0.0.1:8000/delete-resource";
-                                                            headers = ["Authorization" => "Bearer $initialToken"])
+        @test_throws HTTP.Exceptions.StatusError HTTP.request(
+            "DELETE",
+            "http://127.0.0.1:8000/delete-resource";
+            headers = ["Authorization" => "Bearer $initialToken"],
+        )
 
         # 7) Grant admin role, then signin again to refresh JWT with new permissions
         assignRole(user.id, "admin")
@@ -351,8 +437,11 @@ OrionAuth.init!()
         updatedToken = JSON3.parse(signinData)["access_token"]
 
         # 8) DELETE /delete-resource with delete permission → 200 + correct body
-        resp = HTTP.request("DELETE", "http://127.0.0.1:8000/delete-resource";
-                            headers = ["Authorization" => "Bearer $updatedToken"])
+        resp = HTTP.request(
+            "DELETE",
+            "http://127.0.0.1:8000/delete-resource";
+            headers = ["Authorization" => "Bearer $updatedToken"],
+        )
         @test resp.status == 200
         @test String(resp.body) == "deleted"
     end
