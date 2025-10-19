@@ -16,12 +16,7 @@ end
 
 OrionAuth.init!()
 
-@testset verbose=true "OrionAuth" begin
-    # Include framework-agnostic tests
-    include("test_generic.jl")
-    include("test_httpjl.jl")
-    include("test_oxygen.jl")
-    
+@testset verbose=true "OrionAuth" begin    
     @testset "Password hashing" begin
         password = "correct horse battery staple"
 
@@ -286,13 +281,13 @@ OrionAuth.init!()
             Auth()                                 # throws 401/400 if not authorized
             "protected content"
         end
-        route("/protected", protected, method = "GET")
+        Genie.route("/protected", protected, method = "GET")
 
         function userRoute()
             data = getUserData()                   # throws 401/400 if not authorized
             JSON3.write(data)
         end
-        route("/user", userRoute, method = "GET")
+        Genie.route("/user", userRoute, method = "GET")
 
         function deleteResource()
             Auth()
@@ -302,7 +297,7 @@ OrionAuth.init!()
             end
             "deleted"
         end
-        route("/delete-resource", deleteResource, method = "DELETE")
+        Genie.route("/delete-resource", deleteResource, method = "DELETE")
     end
 
     #-------------------------------------------------------------------------------
@@ -362,8 +357,14 @@ OrionAuth.init!()
         @test String(resp.body) == "deleted"
     end
 
-end
+    # Include framework-agnostic tests
+    include("test_generic.jl")
+    include("test_httpjl.jl")
+    include("test_oxygen.jl")
 
+    # Password reset tests
+    include("test_password_reset.jl")
+end
 
 
 conn = dbConnection()
@@ -377,3 +378,5 @@ dropTable!(conn, "OrionAuth_PasswordReset")
 dropTable!(conn, "OrionAuth_Permission")
 dropTable!(conn, "OrionAuth_Role")
 dropTable!(conn, "OrionAuth_User")
+
+releaseConnection(conn)
