@@ -229,17 +229,26 @@ function removePermission(user_id::Int, permission::String)
     end
 
     # Check if permission exists in the database
+    permission = findFirst(OrionAuth_Permission; query=Dict("where" => Dict("permission" => permission)))
+    if isnothing(permission)
+        error("Permission not found")
+    end
+
     # Using the user["OrionAuth_UserPermission"] to check if the user has the permission
     if isempty(user["OrionAuth_UserPermission"])
-        error("Permission not found")
+        error("User does not have this permission")
     end
 
     existing = nothing
     for perm in user["OrionAuth_UserPermission"]
-        if perm.permissionId == permission
+        if perm.permissionId == permission.id
             existing = perm
             break
         end
+    end
+
+    if existing === nothing
+        error("User does not have this permission")
     end
 
     # Remove the permission from the user

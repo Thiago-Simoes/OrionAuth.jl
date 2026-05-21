@@ -78,6 +78,17 @@ function __ORION__Sign(
     end
 end
 
+function __ORION__ConstantTimeCompare(a::AbstractString, b::AbstractString)::Bool
+    if sizeof(a) != sizeof(b)
+        return false
+    end
+    result = 0
+    for i in 1:sizeof(a)
+        result |= xor(codeunit(a, i), codeunit(b, i))
+    end
+    return result == 0
+end
+
 function __ORION__Verify(
     headerEncoded::AbstractString,
     payloadEncoded::AbstractString,
@@ -87,7 +98,7 @@ function __ORION__Verify(
 )::Bool
     if algorithm in ["HS256", "HS512"]
         expectedSignature = __ORION__Sign(headerEncoded, payloadEncoded, secret, algorithm)
-        return expectedSignature == signature
+        return __ORION__ConstantTimeCompare(expectedSignature, signature)
     else
         error("Unsupported algorithm: $algorithm")
     end

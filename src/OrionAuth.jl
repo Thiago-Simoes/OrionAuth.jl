@@ -74,7 +74,7 @@ function init!()
             :OrionAuth_User,
             [
                 ("id",         INTEGER(), [PrimaryKey(), AutoIncrement()]),
-                ("email",      TEXT(),    []),
+                ("email",      TEXT(),    [Unique()]),
                 ("email_confirmed",      OrionORM.BOOLEAN(),    [Default(true)]),
                 ("name",       TEXT(),    []),
                 ("uuid",       OrionORM.UUID(),    []),

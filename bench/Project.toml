@@ -1,0 +1,16 @@
+name = "OrionAuthBench"
+uuid = "f2e18c9b-1fb9-4e00-9a86-0fd71d2b2b77"
+authors = ["Thiago Simoes"]
+version = "0.1.0"
+
+[deps]
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+HTTP = "cd3eb016-35fb-5094-929b-558a96fad6f3"
+JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
+OrionAuth = "b500a246-f3b7-456f-b081-d82801ca9488"
+OrionORM = "4adc1610-4849-4c0a-9fc4-ca498589e63a"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Sockets = "6462fe0b-24de-5631-8697-dd941f90decc"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+StatsBase = "2913bbd2-ae8a-5f71-8c99-4fb6c76f3a91"

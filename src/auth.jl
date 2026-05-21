@@ -58,12 +58,23 @@ function signup(email::String, name::String, password::String)
     uuid = string(UUIDs.uuid4())
     hashed_password = __ORION__HashPassword(password)
     ts = string(Dates.now())
-    newUser = create(OrionAuth_User, Dict(
-        "email" => email,
-        "name" => name,
-        "uuid" => uuid,
-        "password" => hashed_password
-        ))
+    
+    local newUser
+    try
+        newUser = create(OrionAuth_User, Dict(
+            "email" => email,
+            "name" => name,
+            "uuid" => uuid,
+            "password" => hashed_password
+            ))
+    catch e
+        existing = findFirst(OrionAuth_User; query=Dict("where" => Dict("email" => email)))
+        if !isnothing(existing)
+            error("User already exists")
+        else
+            rethrow(e)
+        end
+    end
     @async LogAction("signup", newUser.id)
     
     payload = GenerateJWT(newUser)
