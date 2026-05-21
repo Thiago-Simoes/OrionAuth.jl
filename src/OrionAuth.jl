@@ -79,6 +79,8 @@ function init!()
                 ("name",       TEXT(),    []),
                 ("uuid",       OrionORM.UUID(),    []),
                 ("password",   TEXT(),    []),
+                ("failed_login_attempts", INTEGER(), [Default(0)]),
+                ("locked_until", TIMESTAMP(), []),
                 ("created_at", TIMESTAMP(),    [Default("CURRENT_TIMESTAMP()")]),
                 ("updated_at", TIMESTAMP(),    [Default("CURRENT_TIMESTAMP()")])
             ]

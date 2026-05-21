@@ -112,13 +112,45 @@ token = JSON3.parse(jwt_data)["access_token"]
 """
 function signin(email::String, password::String)
     local user = findFirst(OrionAuth_User; query=Dict("where" => Dict("email" => email)))
+    
     if user === nothing
-        error("User not found")
+        # Mitigate User Enumeration Timing Attack with a dummy verify
+        dummy_hash = "\$argon2id\$v=19\$m=65536,t=2,p=1\$AAAAAAAAAAAAAAAAAAAAAA\$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        __ORION__VerifyPassword(password, dummy_hash)
+        error("Invalid credentials")
+    end
+
+    # Check if account is locked
+    if !isnothing(user.locked_until)
+        # Handle cases where locked_until is a DateTime or a String representation
+        lock_time = typeof(user.locked_until) == String ? DateTime(user.locked_until, dateformat"yyyy-mm-dd HH:MM:SS") : DateTime(user.locked_until)
+        if Dates.now() < lock_time
+            error("Account temporarily locked due to too many failed attempts")
+        end
     end
     
     if !__ORION__VerifyPassword(password, user.password)
-        error("Invalid password")
+        # Increment failed attempts
+        new_attempts = get(user, :failed_login_attempts, 0) + 1
+        
+        max_attempts = parse(Int, get(ENV, "OrionAuth_MAX_LOGIN_ATTEMPTS", "5"))
+        lock_minutes = parse(Int, get(ENV, "OrionAuth_LOCKOUT_MINUTES", "15"))
+
+        if new_attempts >= max_attempts
+            # Lock the account
+            unlock_time = Dates.format(Dates.now() + Minute(lock_minutes), "yyyy-mm-dd HH:MM:SS")
+            update(OrionAuth_User, Dict("where" => Dict("id" => user.id)), Dict("locked_until" => unlock_time, "failed_login_attempts" => 0))
+            @async LogAction("account_locked", user.id)
+            error("Account temporarily locked due to too many failed attempts")
+        else
+            update(OrionAuth_User, Dict("where" => Dict("id" => user.id)), Dict("failed_login_attempts" => new_attempts))
+            error("Invalid credentials")
+        end
     end
+
+    # Successful login, reset failed attempts
+    update(OrionAuth_User, Dict("where" => Dict("id" => user.id)), Dict("failed_login_attempts" => 0, "locked_until" => nothing))
+    
     @async LogAction("signin", user.id)
 
     payload = GenerateJWT(user)
