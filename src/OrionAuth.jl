@@ -168,6 +168,23 @@ function init!()
             ]
         )
 
+        OrionAuth_Session = Model(
+            :OrionAuth_Session,
+            [
+                ("id", INTEGER(), [PrimaryKey(), AutoIncrement()]),
+                ("userId", INTEGER(), []),
+                ("refresh_token", VARCHAR(255), [Unique()]),
+                ("device_info", TEXT(), []),
+                ("is_revoked", OrionORM.BOOLEAN(), [Default(false)]),
+                ("expires_at", TIMESTAMP(), []),
+                ("created_at", TIMESTAMP(), [Default("CURRENT_TIMESTAMP()")]),
+                ("updated_at", TIMESTAMP(), [Default("CURRENT_TIMESTAMP()")])
+            ],
+            [
+                ("userId", OrionAuth_User, "id", :belongsTo)
+            ]
+        )
+
     end
 
     nothing
@@ -176,6 +193,9 @@ end
 export Auth,
        signin,
        signup,
+       refresh_session,
+       revoke_session,
+       revoke_all_sessions,
        syncRolesPermissions,
        assignRole,
        assignPermission,

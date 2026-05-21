@@ -154,14 +154,123 @@ function signin(email::String, password::String)
     @async LogAction("signin", user.id)
 
     payload = GenerateJWT(user)
+    
+    # Generate Refresh Token and create session
+    refresh_token_hex = bytes2hex(Random.rand(RandomDevice(), UInt8, 32))
+    refresh_exp_days = parse(Int, get(ENV, "OrionAuth_REFRESH_EXP_DAYS", "7"))
+    expires_at = Dates.format(Dates.now(UTC) + Day(refresh_exp_days), "yyyy-mm-dd HH:MM:SS")
+    
+    create(OrionAuth_Session, Dict(
+        "userId" => user.id,
+        "refresh_token" => refresh_token_hex,
+        "device_info" => "Unknown", # Can be extended to accept device info from Context
+        "expires_at" => expires_at
+    ))
 
     returnData = Dict(
         "access_token" => payload,
+        "refresh_token" => refresh_token_hex,
         "token_type" => "Bearer",
         "expiration" => parse(Int, ENV["OrionAuth_JWT_EXP"])*60,
     ) |> JSON3.write
 
     return user, returnData
+end
+
+"""
+    refresh_session(refresh_token::String) -> (User, String)
+
+Exchange a valid refresh token for a new access token.
+
+# Arguments
+- `refresh_token::String`: The long-lived refresh token string
+
+# Returns
+- Tuple of (User object, JWT response JSON string)
+
+# Throws
+- `ResponseException(401, ...)`: If token is invalid, revoked, or expired
+"""
+function refresh_session(refresh_token::String)
+    session = findFirst(OrionAuth_Session; query=Dict("where" => Dict("refresh_token" => refresh_token)))
+    
+    if isnothing(session)
+        throw(ResponseException(401, [], "Invalid or revoked refresh token"))
+    end
+    
+    if session.is_revoked == true || session.is_revoked == 1
+        throw(ResponseException(401, [], "Invalid or revoked refresh token"))
+    end
+    
+    expires_time = typeof(session.expires_at) == String ? DateTime(session.expires_at, dateformat"yyyy-mm-dd HH:MM:SS") : DateTime(session.expires_at)
+    if Dates.now(UTC) > expires_time
+        # Token expired, clean up
+        update(OrionAuth_Session, Dict("where" => Dict("id" => session.id)), Dict("is_revoked" => true))
+        throw(ResponseException(401, [], "Refresh token has expired"))
+    end
+    
+    user = findFirst(OrionAuth_User; query=Dict("where" => Dict("id" => session.userId)))
+    if isnothing(user)
+        throw(ResponseException(401, [], "User associated with session not found"))
+    end
+    
+    # Generate new JWT
+    payload = GenerateJWT(user)
+    
+    returnData = Dict(
+        "access_token" => payload,
+        "refresh_token" => refresh_token,
+        "token_type" => "Bearer",
+        "expiration" => parse(Int, ENV["OrionAuth_JWT_EXP"])*60,
+    ) |> JSON3.write
+    
+    @async LogAction("refresh_session", user.id)
+
+    return user, returnData
+end
+
+"""
+    revoke_session(refresh_token::String) -> Bool
+
+Revokes a specific session immediately.
+
+# Arguments
+- `refresh_token::String`: The refresh token of the session to revoke
+
+# Returns
+- `Bool`: true if successfully revoked
+"""
+function revoke_session(refresh_token::String)
+    session = findFirst(OrionAuth_Session; query=Dict("where" => Dict("refresh_token" => refresh_token)))
+    if !isnothing(session)
+        update(OrionAuth_Session, Dict("where" => Dict("id" => session.id)), Dict("is_revoked" => true))
+        @async LogAction("revoke_session", session.userId)
+        return true
+    end
+    return false
+end
+
+"""
+    revoke_all_sessions(user_id::Int) -> Bool
+
+Revokes all active sessions for a user (Kill switch).
+
+# Arguments
+- `user_id::Int`: The user's ID
+
+# Returns
+- `Bool`: true if successfully executed
+"""
+function revoke_all_sessions(user_id::Int)
+    user = findFirst(OrionAuth_User; query=Dict("where" => Dict("id" => user_id)))
+    if isnothing(user)
+        error("User not found")
+    end
+    
+    updateMany(OrionAuth_Session, Dict("where" => Dict("userId" => user_id)), Dict("is_revoked" => true))
+    @async LogAction("revoke_all_sessions", user_id)
+    
+    return true
 end
 
 """
