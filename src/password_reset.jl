@@ -147,7 +147,7 @@ function verify_reset_token(token::String)
     created_at = DateTime(reset_record.created_at)
     expiration_time = created_at + Minute(expiration_minutes)
     
-    if now() > expiration_time
+    if Dates.now(UTC) > expiration_time
         # Token expired, delete it
         deleteMany(OrionAuth_PasswordReset, Dict("where" => Dict("id" => reset_record.id)))
         return nothing

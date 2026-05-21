@@ -18,13 +18,19 @@ LogAction("signup", user)
 LogAction("signin", 123)
 ```
 """
-function LogAction(action::String, user)
-    return LogAction(action, user.id)
+function LogAction(action::String, user; ctx::Union{RequestContext, Nothing}=nothing)
+    return LogAction(action, user.id; ctx=ctx)
 end
 
-function LogAction(action::String, userId::Int)
-    ts = string(Dates.now())
-    return create(OrionAuth_Log, Dict("userId"=>userId, "action"=>action, "timestamp"=>ts))
+function LogAction(action::String, userId::Int; ctx::Union{RequestContext, Nothing}=nothing)
+    ts = string(Dates.now(UTC))
+    ip = "Unknown"
+    ua = "Unknown"
+    if !isnothing(ctx)
+        ip = get_client_ip(ctx)
+        ua = get_user_agent(ctx)
+    end
+    return create(OrionAuth_Log, Dict("userId"=>userId, "action"=>action, "ip_address"=>ip, "user_agent"=>ua, "timestamp"=>ts))
 end
 
 """
@@ -50,7 +56,7 @@ println(user.email)  # "user@example.com"
 token = JSON3.parse(jwt_data)["access_token"]
 ```
 """
-function signup(email::String, name::String, password::String)
+function signup(email::String, name::String, password::String; ctx::Union{RequestContext, Nothing}=nothing)
     existing = findFirst(OrionAuth_User; query=Dict("where" => Dict("email" => email)))
     if !isnothing(existing)
         error("User already exists")
@@ -75,7 +81,7 @@ function signup(email::String, name::String, password::String)
             rethrow(e)
         end
     end
-    @async LogAction("signup", newUser.id)
+    @async LogAction("signup", newUser.id; ctx=ctx)
     
     payload = GenerateJWT(newUser)
     
@@ -110,7 +116,7 @@ user, jwt_data = signin("user@example.com", "securepass123")
 token = JSON3.parse(jwt_data)["access_token"]
 ```
 """
-function signin(email::String, password::String)
+function signin(email::String, password::String; ctx::Union{RequestContext, Nothing}=nothing)
     local user = findFirst(OrionAuth_User; query=Dict("where" => Dict("email" => email)))
     
     if user === nothing
@@ -124,7 +130,7 @@ function signin(email::String, password::String)
     if !isnothing(user.locked_until)
         # Handle cases where locked_until is a DateTime or a String representation
         lock_time = typeof(user.locked_until) == String ? DateTime(user.locked_until, dateformat"yyyy-mm-dd HH:MM:SS") : DateTime(user.locked_until)
-        if Dates.now() < lock_time
+        if Dates.now(UTC) < lock_time
             error("Account temporarily locked due to too many failed attempts")
         end
     end
@@ -138,9 +144,9 @@ function signin(email::String, password::String)
 
         if new_attempts >= max_attempts
             # Lock the account
-            unlock_time = Dates.format(Dates.now() + Minute(lock_minutes), "yyyy-mm-dd HH:MM:SS")
+            unlock_time = Dates.format(Dates.now(UTC) + Minute(lock_minutes), "yyyy-mm-dd HH:MM:SS")
             update(OrionAuth_User, Dict("where" => Dict("id" => user.id)), Dict("locked_until" => unlock_time, "failed_login_attempts" => 0))
-            @async LogAction("account_locked", user.id)
+            @async LogAction("account_locked", user.id; ctx=ctx)
             error("Account temporarily locked due to too many failed attempts")
         else
             update(OrionAuth_User, Dict("where" => Dict("id" => user.id)), Dict("failed_login_attempts" => new_attempts))
@@ -151,7 +157,7 @@ function signin(email::String, password::String)
     # Successful login, reset failed attempts
     update(OrionAuth_User, Dict("where" => Dict("id" => user.id)), Dict("failed_login_attempts" => 0, "locked_until" => nothing))
     
-    @async LogAction("signin", user.id)
+    @async LogAction("signin", user.id; ctx=ctx)
 
     payload = GenerateJWT(user)
     
@@ -163,7 +169,7 @@ function signin(email::String, password::String)
     create(OrionAuth_Session, Dict(
         "userId" => user.id,
         "refresh_token" => refresh_token_hex,
-        "device_info" => "Unknown", # Can be extended to accept device info from Context
+        "device_info" => isnothing(ctx) ? "Unknown" : get_user_agent(ctx), 
         "expires_at" => expires_at
     ))
 
@@ -191,7 +197,7 @@ Exchange a valid refresh token for a new access token.
 # Throws
 - `ResponseException(401, ...)`: If token is invalid, revoked, or expired
 """
-function refresh_session(refresh_token::String)
+function refresh_session(refresh_token::String; ctx::Union{RequestContext, Nothing}=nothing)
     session = findFirst(OrionAuth_Session; query=Dict("where" => Dict("refresh_token" => refresh_token)))
     
     if isnothing(session)
@@ -224,7 +230,7 @@ function refresh_session(refresh_token::String)
         "expiration" => parse(Int, ENV["OrionAuth_JWT_EXP"])*60,
     ) |> JSON3.write
     
-    @async LogAction("refresh_session", user.id)
+    @async LogAction("refresh_session", user.id; ctx=ctx)
 
     return user, returnData
 end
@@ -240,11 +246,11 @@ Revokes a specific session immediately.
 # Returns
 - `Bool`: true if successfully revoked
 """
-function revoke_session(refresh_token::String)
+function revoke_session(refresh_token::String; ctx::Union{RequestContext, Nothing}=nothing)
     session = findFirst(OrionAuth_Session; query=Dict("where" => Dict("refresh_token" => refresh_token)))
     if !isnothing(session)
         update(OrionAuth_Session, Dict("where" => Dict("id" => session.id)), Dict("is_revoked" => true))
-        @async LogAction("revoke_session", session.userId)
+        @async LogAction("revoke_session", session.userId; ctx=ctx)
         return true
     end
     return false
@@ -261,14 +267,14 @@ Revokes all active sessions for a user (Kill switch).
 # Returns
 - `Bool`: true if successfully executed
 """
-function revoke_all_sessions(user_id::Int)
+function revoke_all_sessions(user_id::Int; ctx::Union{RequestContext, Nothing}=nothing)
     user = findFirst(OrionAuth_User; query=Dict("where" => Dict("id" => user_id)))
     if isnothing(user)
         error("User not found")
     end
     
     updateMany(OrionAuth_Session, Dict("where" => Dict("userId" => user_id)), Dict("is_revoked" => true))
-    @async LogAction("revoke_all_sessions", user_id)
+    @async LogAction("revoke_all_sessions", user_id; ctx=ctx)
     
     return true
 end
@@ -397,8 +403,8 @@ function Auth(ctx::RequestContext, requiredPermission::Union{String, Vector{Stri
     token = extractBearerToken(ctx)
     payload = decodeJWT(token)
 
-    # normalize permissions to a Vector{String}
-    userPermissions = payload["permissions"] .|> r -> r[:permission] .|> String
+    # normalize permissions to a Vector{String} safely
+    userPermissions = get(payload, "permissions", []) .|> r -> r[:permission] .|> String
 
     if requiredPermission != ""
         required = isa(requiredPermission, String) ? [requiredPermission] : requiredPermission

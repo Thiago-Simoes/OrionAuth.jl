@@ -27,7 +27,9 @@ export RequestContext,
        configure_framework!,
        get_configured_framework,
        create_request_context,
-       handle_auth_exception
+       handle_auth_exception,
+       get_client_ip,
+       get_user_agent
 
 # Load adapters - HTTP.jl and Oxygen adapters always available since HTTP is a dependency
 include(joinpath(@__DIR__, "adapters/oxygen.jl"))
@@ -66,6 +68,8 @@ function init!()
                 ("id", INTEGER(), [PrimaryKey(), AutoIncrement()]),
                 ("userId", INTEGER(), []),
                 ("action", TEXT(), []),
+                ("ip_address", VARCHAR(45), [Default("Unknown")]),
+                ("user_agent", TEXT(), [Default("Unknown")]),
                 ("timestamp", TEXT(), [])
             ]
         )

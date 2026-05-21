@@ -282,3 +282,33 @@ struct GenericRequestContext <: RequestContext
 end
 
 get_headers(ctx::GenericRequestContext) = ctx.headers
+
+"""
+    get_client_ip(ctx::RequestContext) -> String
+
+Extract client IP from request headers (x-forwarded-for).
+"""
+function get_client_ip(ctx::RequestContext)
+    headers = get_headers(ctx)
+    for (k, v) in headers
+        if lowercase(k) == "x-forwarded-for"
+            return strip(split(v, ",")[1])
+        end
+    end
+    return "Unknown"
+end
+
+"""
+    get_user_agent(ctx::RequestContext) -> String
+
+Extract User-Agent from request headers.
+"""
+function get_user_agent(ctx::RequestContext)
+    headers = get_headers(ctx)
+    for (k, v) in headers
+        if lowercase(k) == "user-agent"
+            return v
+        end
+    end
+    return "Unknown"
+end
